@@ -31,9 +31,10 @@ public record AnnouncementPlaybackRequest(
 
     private static String sequenceIdFor(AnnouncementEventType eventType) {
         return switch (eventType) {
-            case PLATFORM_DOOR_CLOSING, DOOR_CLOSING, SAFETY_NOTICE -> "priority_high_test";
-            case ONBOARD_NEXT_STOP -> "onboard_next_stop_test";
-            default -> "onboard_next_stop_test";
+            case DOOR_CLOSING -> "onboard_door_closing_dynamic";
+            case PLATFORM_DOOR_CLOSING, SAFETY_NOTICE -> "platform_door_closing_dynamic";
+            case ONBOARD_NEXT_STOP -> "onboard_next_stop_dynamic";
+            default -> "onboard_next_stop_dynamic";
         };
     }
 

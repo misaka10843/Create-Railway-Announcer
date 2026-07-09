@@ -6,10 +6,6 @@ public record PlaybackStartResult(
         PlaybackSession previous,
         String message
 ) {
-    public boolean accepted() {
-        return decision != PlaybackStartDecision.REJECTED_LOWER_PRIORITY;
-    }
-
     public static PlaybackStartResult started(PlaybackSession session) {
         return new PlaybackStartResult(
                 PlaybackStartDecision.STARTED,
@@ -35,5 +31,9 @@ public record PlaybackStartResult(
                 previous,
                 "Playback request rejected because an active session has higher priority."
         );
+    }
+
+    public boolean accepted() {
+        return decision != PlaybackStartDecision.REJECTED_LOWER_PRIORITY;
     }
 }

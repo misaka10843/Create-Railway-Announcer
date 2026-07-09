@@ -4,10 +4,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class LineConfig {
-    private String id = "";
     private final Map<String, String> display = new HashMap<>();
     private final Map<String, String> reading = new HashMap<>();
     private final Map<String, String> shortName = new HashMap<>();
+    private String id = "";
 
     public String getId() {
         return id;

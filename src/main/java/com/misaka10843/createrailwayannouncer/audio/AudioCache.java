@@ -2,7 +2,6 @@ package com.misaka10843.createrailwayannouncer.audio;
 
 import com.misaka10843.createrailwayannouncer.CreateRailwayAnnouncer;
 import com.misaka10843.createrailwayannouncer.tts.TtsRequest;
-import com.misaka10843.createrailwayannouncer.tts.TtsResult;
 import com.misaka10843.createrailwayannouncer.tts.WindowsBridgeTtsProvider;
 import net.neoforged.fml.loading.FMLPaths;
 
@@ -22,13 +21,6 @@ public final class AudioCache {
     public AudioCache(WindowsBridgeTtsProvider provider, AudioEncoder encoder) {
         this.provider = provider;
         this.encoder = encoder;
-    }
-
-    private AudioEncoder encoder() {
-        if (encoder == null) {
-            encoder = createDefaultEncoder();
-        }
-        return encoder;
     }
 
     private static AudioEncoder createDefaultEncoder() {
@@ -54,6 +46,29 @@ public final class AudioCache {
                 }
             };
         }
+    }
+
+    private static void cleanupTemp(Path tempWav) {
+        try {
+            Files.deleteIfExists(tempWav);
+        } catch (IOException e) {
+            CreateRailwayAnnouncer.LOGGER.debug("Failed to delete temp wav {}", tempWav, e);
+        }
+    }
+
+    private static void cleanupBrokenOutput(Path output) {
+        try {
+            Files.deleteIfExists(output);
+        } catch (IOException e) {
+            CreateRailwayAnnouncer.LOGGER.debug("Failed to delete broken ogg {}", output, e);
+        }
+    }
+
+    private AudioEncoder encoder() {
+        if (encoder == null) {
+            encoder = createDefaultEncoder();
+        }
+        return encoder;
     }
 
     public CompletableFuture<AudioFragmentResult> resolveOrGenerate(AudioFragmentKey key) {
@@ -143,21 +158,5 @@ public final class AudioCache {
 
     public Path tempRoot() {
         return root().resolve("tmp");
-    }
-
-    private static void cleanupTemp(Path tempWav) {
-        try {
-            Files.deleteIfExists(tempWav);
-        } catch (IOException e) {
-            CreateRailwayAnnouncer.LOGGER.debug("Failed to delete temp wav {}", tempWav, e);
-        }
-    }
-
-    private static void cleanupBrokenOutput(Path output) {
-        try {
-            Files.deleteIfExists(output);
-        } catch (IOException e) {
-            CreateRailwayAnnouncer.LOGGER.debug("Failed to delete broken ogg {}", output, e);
-        }
     }
 }

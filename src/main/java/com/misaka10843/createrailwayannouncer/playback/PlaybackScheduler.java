@@ -19,6 +19,14 @@ public final class PlaybackScheduler {
     private volatile boolean stopRequested = false;
     private volatile SequenceAudioBackend currentBackend;
 
+    private static void pause(int pauseMs) throws InterruptedException {
+        if (pauseMs <= 0) {
+            return;
+        }
+
+        Thread.sleep(pauseMs);
+    }
+
     public PlaybackState state() {
         return state;
     }
@@ -97,13 +105,5 @@ public final class PlaybackScheduler {
         } finally {
             currentBackend = null;
         }
-    }
-
-    private static void pause(int pauseMs) throws InterruptedException {
-        if (pauseMs <= 0) {
-            return;
-        }
-
-        Thread.sleep(pauseMs);
     }
 }

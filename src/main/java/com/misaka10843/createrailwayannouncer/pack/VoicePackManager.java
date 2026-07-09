@@ -6,8 +6,8 @@ import java.util.Optional;
 
 public final class VoicePackManager {
     private static final PhraseRegistry PHRASES = new PhraseRegistry();
-    private static VoicePack activePack;
     private static final SequenceRegistry SEQUENCES = new SequenceRegistry();
+    private static VoicePack activePack;
 
     private VoicePackManager() {
     }

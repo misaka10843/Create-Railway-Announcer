@@ -20,6 +20,26 @@ public record AudioFragmentKey(
         String input,
         boolean ssml
 ) {
+    private static String sanitize(String value) {
+        String normalized = value == null ? "unknown" : value.trim().toLowerCase(Locale.ROOT);
+        normalized = normalized.replace('\\', '_').replace('/', '_').replace(':', '_');
+        normalized = normalized.replaceAll("[^a-z0-9._\\-]+", "_");
+        normalized = normalized.replaceAll("_+", "_");
+        normalized = normalized.replaceAll("^_+", "");
+        normalized = normalized.replaceAll("_+$", "");
+        return normalized.isBlank() ? "unknown" : normalized;
+    }
+
+    private static String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(bytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
+    }
+
     public String safeId() {
         return sanitize(id);
     }
@@ -48,25 +68,5 @@ public record AudioFragmentKey(
     public String voiceDirectory() {
         String voice = voiceContains == null || voiceContains.isBlank() ? "auto" : voiceContains;
         return sanitize(voice);
-    }
-
-    private static String sanitize(String value) {
-        String normalized = value == null ? "unknown" : value.trim().toLowerCase(Locale.ROOT);
-        normalized = normalized.replace('\\', '_').replace('/', '_').replace(':', '_');
-        normalized = normalized.replaceAll("[^a-z0-9._\\-]+", "_");
-        normalized = normalized.replaceAll("_+", "_");
-        normalized = normalized.replaceAll("^_+", "");
-        normalized = normalized.replaceAll("_+$", "");
-        return normalized.isBlank() ? "unknown" : normalized;
-    }
-
-    private static String sha256(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(bytes);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
     }
 }

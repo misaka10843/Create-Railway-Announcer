@@ -3,10 +3,11 @@ package com.misaka10843.createrailwayannouncer.playback;
 import com.misaka10843.createrailwayannouncer.CreateRailwayAnnouncer;
 import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequence;
 import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequenceItem;
-import java.util.concurrent.CompletableFuture;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
+
+import java.util.concurrent.CompletableFuture;
 
 public final class LoggingSequenceAudioBackend implements SequenceAudioBackend {
     private final CommandSourceStack source;
@@ -58,6 +59,7 @@ public final class LoggingSequenceAudioBackend implements SequenceAudioBackend {
 
         return CompletableFuture.completedFuture(null);
     }
+
     @Override
     public void showSubtitle(ResolvedSequence sequence, ResolvedSequenceItem item) {
         String message = "DRY SUBTITLE: " + item.text();

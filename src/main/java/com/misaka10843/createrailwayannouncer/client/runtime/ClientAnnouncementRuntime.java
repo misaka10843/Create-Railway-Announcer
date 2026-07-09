@@ -6,6 +6,7 @@ import com.misaka10843.createrailwayannouncer.playback.PlaybackManager;
 import com.misaka10843.createrailwayannouncer.playback.PlaybackSession;
 import com.misaka10843.createrailwayannouncer.playback.PlaybackStartResult;
 import com.misaka10843.createrailwayannouncer.playback.SequenceAudioBackend;
+import com.misaka10843.createrailwayannouncer.sequence.AnnouncementResolveContext;
 import com.misaka10843.createrailwayannouncer.sequence.SequenceResolver;
 import com.misaka10843.createrailwayannouncer.sequence.SequenceTemplate;
 
@@ -23,6 +24,10 @@ public final class ClientAnnouncementRuntime {
     ) {
         this.sequenceResolver = sequenceResolver;
         this.backend = backend;
+    }
+
+    public static PlaybackManager playbackManager() {
+        return PLAYBACK_MANAGER;
     }
 
     public CompletableFuture<PlaybackStartResult> play(AnnouncementPlaybackRequest request) {
@@ -48,7 +53,10 @@ public final class ClientAnnouncementRuntime {
                 request.trainId()
         );
 
-        return sequenceResolver.resolveSequence(template)
+        AnnouncementResolveContext resolveContext =
+                AnnouncementResolveContext.forStationId(request.stationId());
+
+        return sequenceResolver.resolveSequence(template, resolveContext)
                 .thenApply(sequence -> {
                     PlaybackStartResult result = PLAYBACK_MANAGER.play(sequence, backend);
 
@@ -71,9 +79,5 @@ public final class ClientAnnouncementRuntime {
 
                     return result;
                 });
-    }
-
-    public static PlaybackManager playbackManager() {
-        return PLAYBACK_MANAGER;
     }
 }

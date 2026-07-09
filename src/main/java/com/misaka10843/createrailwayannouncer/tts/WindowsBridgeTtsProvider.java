@@ -25,6 +25,66 @@ public final class WindowsBridgeTtsProvider implements TtsProvider {
         return thread;
     });
 
+    private static Path createInputFile(TtsRequest request) throws IOException {
+        String suffix = request.ssml() ? ".ssml" : ".txt";
+        Path inputFile = Files.createTempFile("cra_tts_input_", suffix);
+        Files.writeString(inputFile, request.input(), StandardCharsets.UTF_8);
+        inputFile.toFile().deleteOnExit();
+        return inputFile;
+    }
+
+    private static List<String> buildSynthCommand(Path bridge, TtsRequest request, Path inputFile) {
+        List<String> command = new ArrayList<>();
+
+        command.add(bridge.toString());
+        command.add("synth");
+
+        command.add("--backend");
+        command.add(toBridgeBackend(request.backend()));
+
+        if (request.ssml()) {
+            command.add("--ssml-file");
+        } else {
+            command.add("--text-file");
+        }
+        command.add(inputFile.toString());
+
+        command.add("--out");
+        command.add(request.output().toString());
+
+        command.add("--language");
+        command.add(request.language());
+
+        if (request.voiceContains() != null && !request.voiceContains().isBlank()) {
+            command.add("--voice-contains");
+            command.add(request.voiceContains());
+        }
+
+        command.add("--rate");
+        command.add(Double.toString(request.rate()));
+
+        command.add("--volume");
+        command.add(Integer.toString(request.volume()));
+
+        return command;
+    }
+
+    public static String toBridgeBackend(TtsBackend backend) {
+        return switch (backend) {
+            case AUTO -> "auto";
+            case SAPI -> "sapi";
+            case WINRT -> "winrt";
+            case OFF -> "off";
+        };
+    }
+
+    private static String readString(JsonObject object, String key, String fallback) {
+        if (!object.has(key) || object.get(key).isJsonNull()) {
+            return fallback;
+        }
+        return object.get(key).getAsString();
+    }
+
     @Override
     public String id() {
         return "windows_bridge";
@@ -97,66 +157,6 @@ public final class WindowsBridgeTtsProvider implements TtsProvider {
             CreateRailwayAnnouncer.LOGGER.warn("TTS generation failed", e);
             return TtsResult.failure(e.getMessage());
         }
-    }
-
-    private static Path createInputFile(TtsRequest request) throws IOException {
-        String suffix = request.ssml() ? ".ssml" : ".txt";
-        Path inputFile = Files.createTempFile("cra_tts_input_", suffix);
-        Files.writeString(inputFile, request.input(), StandardCharsets.UTF_8);
-        inputFile.toFile().deleteOnExit();
-        return inputFile;
-    }
-
-    private static List<String> buildSynthCommand(Path bridge, TtsRequest request, Path inputFile) {
-        List<String> command = new ArrayList<>();
-
-        command.add(bridge.toString());
-        command.add("synth");
-
-        command.add("--backend");
-        command.add(toBridgeBackend(request.backend()));
-
-        if (request.ssml()) {
-            command.add("--ssml-file");
-        } else {
-            command.add("--text-file");
-        }
-        command.add(inputFile.toString());
-
-        command.add("--out");
-        command.add(request.output().toString());
-
-        command.add("--language");
-        command.add(request.language());
-
-        if (request.voiceContains() != null && !request.voiceContains().isBlank()) {
-            command.add("--voice-contains");
-            command.add(request.voiceContains());
-        }
-
-        command.add("--rate");
-        command.add(Double.toString(request.rate()));
-
-        command.add("--volume");
-        command.add(Integer.toString(request.volume()));
-
-        return command;
-    }
-
-    public static String toBridgeBackend(TtsBackend backend) {
-        return switch (backend) {
-            case AUTO -> "auto";
-            case SAPI -> "sapi";
-            case WINRT -> "winrt";
-            case OFF -> "off";
-        };
-    }
-
-    private static String readString(JsonObject object, String key, String fallback) {
-        if (!object.has(key) || object.get(key).isJsonNull()) {
-            return fallback;
-        }
-        return object.get(key).getAsString();
     }
 
     public CompletableFuture<BridgeProcessResult> listVoices(TtsBackend backend, String language, boolean naturalOnly) {

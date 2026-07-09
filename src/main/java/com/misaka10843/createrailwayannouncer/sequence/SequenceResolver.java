@@ -5,7 +5,7 @@ import com.misaka10843.createrailwayannouncer.audio.AudioCache;
 import com.misaka10843.createrailwayannouncer.audio.AudioFragmentKey;
 import com.misaka10843.createrailwayannouncer.audio.AudioFragmentResult;
 import com.misaka10843.createrailwayannouncer.audio.AudioFragmentType;
-import com.misaka10843.createrailwayannouncer.config.ClientConfig;
+import com.misaka10843.createrailwayannouncer.config.*;
 import com.misaka10843.createrailwayannouncer.pack.PhraseEntry;
 import com.misaka10843.createrailwayannouncer.pack.VoicePackManager;
 import com.misaka10843.createrailwayannouncer.tts.TtsBackend;
@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 public final class SequenceResolver {
@@ -24,14 +25,120 @@ public final class SequenceResolver {
         this.audioCache = audioCache;
     }
 
+    private static String doorSidePhraseId(AnnouncementResolveContext context) {
+        if (context == null || context.station() == null) {
+            return "";
+        }
+
+        DoorSide doorSide = context.station().getDoorSide();
+
+        return switch (doorSide) {
+            case LEFT -> "common.door_left";
+            case RIGHT -> "common.door_right";
+            case BOTH -> "common.door_both";
+            case NONE -> "";
+        };
+    }
+
+    private static String replaceContextVariables(
+            String text,
+            AnnouncementResolveContext context
+    ) {
+        if (context == null || context.station() == null) {
+            return text;
+        }
+
+        StationConfig station = context.station();
+        String stationDisplay = localized(station.getDisplay(), station.getReading(), station.getCustomId());
+        String stationReading = localized(station.getReading(), station.getDisplay(), station.getCustomId());
+
+        return text
+                .replace("{station}", stationDisplay)
+                .replace("{station_reading}", stationReading)
+                .replace("{platform}", station.getPlatform() == null ? "" : station.getPlatform());
+    }
+
+    private static String localized(
+            Map<String, String> primary,
+            Map<String, String> fallback,
+            String fallbackText
+    ) {
+        String language = ClientConfig.TTS_LANGUAGE.get()
+                .trim()
+                .toLowerCase(Locale.ROOT)
+                .replace('-', '_');
+
+        String value = primary.get(language);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+
+        value = primary.get("ja_jp");
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+
+        value = fallback.get(language);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+
+        value = fallback.get("ja_jp");
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+
+        return fallbackText == null ? "" : fallbackText;
+    }
+
+    private static TtsBackend readBackend() {
+        String value = ClientConfig.TTS_BACKEND.get().trim().toUpperCase(Locale.ROOT);
+        try {
+            return TtsBackend.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            return TtsBackend.AUTO;
+        }
+    }
+
+    private static String readString(JsonObject object, String key, String fallback) {
+        if (!object.has(key) || object.get(key).isJsonNull()) {
+            return fallback;
+        }
+        return object.get(key).getAsString();
+    }
+
+    private static int readInt(JsonObject object, String key, int fallback) {
+        if (!object.has(key) || object.get(key).isJsonNull()) {
+            return fallback;
+        }
+        return object.get(key).getAsInt();
+    }
+
+    private static boolean readBoolean(JsonObject object, String key, boolean fallback) {
+        if (!object.has(key) || object.get(key).isJsonNull()) {
+            return fallback;
+        }
+        return object.get(key).getAsBoolean();
+    }
+
     public CompletableFuture<List<AudioFragmentResult>> resolveAudioFragments(SequenceTemplate template) {
+        return resolveAudioFragments(template, AnnouncementResolveContext.empty());
+    }
+
+    public CompletableFuture<List<AudioFragmentResult>> resolveAudioFragments(
+            SequenceTemplate template,
+            AnnouncementResolveContext context
+    ) {
         List<CompletableFuture<AudioFragmentResult>> futures = new ArrayList<>();
+
         for (SequenceItem item : template.items()) {
             switch (item.type()) {
                 case PHRASE -> resolvePhrase(item.raw(), futures);
-                case STATION -> resolveStation(item.raw(), futures);
+                case STATION -> resolveStation(item.raw(), context, futures);
                 case LINE -> resolveLine(item.raw(), futures);
-                case PAUSE, SOUND, SUBTITLE, CONDITION, TRANSFER_LINES, DOOR_SIDE_PHRASE, TTS_RAW -> {
+                case TRANSFER_LINES -> resolveTransferLines(context, futures);
+                case DOOR_SIDE_PHRASE -> resolveDoorSidePhrase(context, futures);
+                case PAUSE, SOUND, SUBTITLE, CONDITION, TTS_RAW -> {
                 }
             }
         }
@@ -41,10 +148,21 @@ public final class SequenceResolver {
     }
 
     public CompletableFuture<ResolvedSequence> resolveSequence(SequenceTemplate template) {
+        return resolveSequence(template, AnnouncementResolveContext.empty());
+    }
+
+    public CompletableFuture<ResolvedSequence> resolveSequence(
+            SequenceTemplate template,
+            AnnouncementResolveContext context
+    ) {
+        AnnouncementResolveContext safeContext = context == null
+                ? AnnouncementResolveContext.empty()
+                : context;
+
         List<CompletableFuture<List<ResolvedSequenceItem>>> futures = new ArrayList<>();
 
         for (SequenceItem item : template.items()) {
-            futures.add(resolveItem(item));
+            futures.add(resolveItem(item, safeContext));
         }
 
         return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
@@ -65,21 +183,30 @@ public final class SequenceResolver {
                 });
     }
 
-    private CompletableFuture<List<ResolvedSequenceItem>> resolveItem(SequenceItem item) {
+    private CompletableFuture<List<ResolvedSequenceItem>> resolveItem(
+            SequenceItem item,
+            AnnouncementResolveContext context
+    ) {
         return switch (item.type()) {
             case PHRASE -> resolvePhraseItem(item.raw());
-            case STATION -> resolveStationItem(item.raw());
+            case STATION -> resolveStationItem(item.raw(), context);
             case LINE -> resolveLineItem(item.raw());
+            case TRANSFER_LINES -> resolveTransferLinesItem(item.raw(), context);
+            case DOOR_SIDE_PHRASE -> resolveDoorSidePhraseItem(context);
             case PAUSE -> CompletableFuture.completedFuture(resolvePauseItem(item.raw()));
-            case SUBTITLE -> CompletableFuture.completedFuture(resolveSubtitleItem(item.raw()));
+            case SUBTITLE -> CompletableFuture.completedFuture(resolveSubtitleItem(item.raw(), context));
             case SOUND -> CompletableFuture.completedFuture(resolveSoundItem(item.raw()));
-            case CONDITION, TRANSFER_LINES, DOOR_SIDE_PHRASE, TTS_RAW -> CompletableFuture.completedFuture(List.of());
+            case CONDITION, TTS_RAW -> CompletableFuture.completedFuture(List.of());
         };
     }
 
     private CompletableFuture<List<ResolvedSequenceItem>> resolvePhraseItem(JsonObject raw) {
         String id = readString(raw, "id", "");
-        if (id.isBlank()) {
+        return resolvePhraseId(id);
+    }
+
+    private CompletableFuture<List<ResolvedSequenceItem>> resolvePhraseId(String id) {
+        if (id == null || id.isBlank()) {
             return CompletableFuture.completedFuture(List.of());
         }
 
@@ -96,33 +223,40 @@ public final class SequenceResolver {
                 entry.ssml()
         );
 
-        return audioCache.resolveOrGenerate(key).thenApply(result -> toAudioItem(result));
+        return audioCache.resolveOrGenerate(key).thenApply(this::toAudioItem);
     }
 
-    private CompletableFuture<List<ResolvedSequenceItem>> resolveStationItem(JsonObject raw) {
-        String id = readString(raw, "id", "");
-        String variant = readString(raw, "variant", "default");
-        String text = readString(raw, "text", "");
-
-        if (id.isBlank() || text.isBlank()) {
+    private CompletableFuture<List<ResolvedSequenceItem>> resolveStationItem(
+            JsonObject raw,
+            AnnouncementResolveContext context
+    ) {
+        StationFragment fragment = stationFragment(raw, context);
+        if (fragment == null) {
             return CompletableFuture.completedFuture(List.of());
         }
 
         AudioFragmentKey key = createKey(
                 AudioFragmentType.STATION,
-                id,
-                variant,
-                text,
+                fragment.id(),
+                fragment.variant(),
+                fragment.text(),
                 false
         );
 
-        return audioCache.resolveOrGenerate(key).thenApply(result -> toAudioItem(result));
+        return audioCache.resolveOrGenerate(key).thenApply(this::toAudioItem);
     }
 
     private CompletableFuture<List<ResolvedSequenceItem>> resolveLineItem(JsonObject raw) {
         String id = readString(raw, "id", "");
         String variant = readString(raw, "variant", "default");
         String text = readString(raw, "text", "");
+
+        if (text.isBlank() && !id.isBlank()) {
+            LineConfig line = StationLineConfigStore.line(id).orElse(null);
+            if (line != null) {
+                text = localized(line.getReading(), line.getDisplay(), id);
+            }
+        }
 
         if (id.isBlank() || text.isBlank()) {
             return CompletableFuture.completedFuture(List.of());
@@ -136,7 +270,66 @@ public final class SequenceResolver {
                 false
         );
 
-        return audioCache.resolveOrGenerate(key).thenApply(result -> toAudioItem(result));
+        return audioCache.resolveOrGenerate(key).thenApply(this::toAudioItem);
+    }
+
+    private CompletableFuture<List<ResolvedSequenceItem>> resolveTransferLinesItem(
+            JsonObject raw,
+            AnnouncementResolveContext context
+    ) {
+        if (context == null || context.transferLines().isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        int pauseMs = readInt(raw, "pause_ms_between", 180);
+        boolean includeSuffix = readBoolean(raw, "include_suffix", true);
+
+        List<CompletableFuture<List<ResolvedSequenceItem>>> futures = new ArrayList<>();
+
+        for (int i = 0; i < context.transferLines().size(); i++) {
+            LineConfig line = context.transferLines().get(i);
+            String lineText = localized(line.getReading(), line.getDisplay(), line.getId());
+            if (line.getId().isBlank() || lineText.isBlank()) {
+                continue;
+            }
+
+            AudioFragmentKey key = createKey(
+                    AudioFragmentType.LINE,
+                    line.getId(),
+                    "bare",
+                    lineText,
+                    false
+            );
+
+            CompletableFuture<List<ResolvedSequenceItem>> future = audioCache.resolveOrGenerate(key)
+                    .thenApply(this::toAudioItem);
+
+            futures.add(future);
+
+            if (pauseMs > 0 && i < context.transferLines().size() - 1) {
+                futures.add(CompletableFuture.completedFuture(List.of(ResolvedSequenceItem.pause(pauseMs))));
+            }
+        }
+
+        if (includeSuffix) {
+            futures.add(resolvePhraseId("common.transfer_suffix"));
+        }
+
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+                .thenApply(ignored -> {
+                    List<ResolvedSequenceItem> items = new ArrayList<>();
+                    for (CompletableFuture<List<ResolvedSequenceItem>> future : futures) {
+                        items.addAll(future.join());
+                    }
+                    return items;
+                });
+    }
+
+    private CompletableFuture<List<ResolvedSequenceItem>> resolveDoorSidePhraseItem(
+            AnnouncementResolveContext context
+    ) {
+        String phraseId = doorSidePhraseId(context);
+        return resolvePhraseId(phraseId);
     }
 
     private List<ResolvedSequenceItem> resolvePauseItem(JsonObject raw) {
@@ -144,11 +337,21 @@ public final class SequenceResolver {
         return List.of(ResolvedSequenceItem.pause(durationMs));
     }
 
-    private List<ResolvedSequenceItem> resolveSubtitleItem(JsonObject raw) {
+    private List<ResolvedSequenceItem> resolveSubtitleItem(
+            JsonObject raw,
+            AnnouncementResolveContext context
+    ) {
         String text = readString(raw, "text", "");
         if (text.isBlank()) {
             return List.of();
         }
+
+        text = replaceContextVariables(text, context);
+
+        if (text.isBlank()) {
+            return List.of();
+        }
+
         return List.of(ResolvedSequenceItem.subtitle(text));
     }
 
@@ -213,20 +416,21 @@ public final class SequenceResolver {
         futures.add(audioCache.resolveOrGenerate(key));
     }
 
-    private void resolveStation(JsonObject raw, List<CompletableFuture<AudioFragmentResult>> futures) {
-        String id = readString(raw, "id", "");
-        String variant = readString(raw, "variant", "default");
-        String text = readString(raw, "text", "");
-
-        if (id.isBlank() || text.isBlank()) {
+    private void resolveStation(
+            JsonObject raw,
+            AnnouncementResolveContext context,
+            List<CompletableFuture<AudioFragmentResult>> futures
+    ) {
+        StationFragment fragment = stationFragment(raw, context);
+        if (fragment == null) {
             return;
         }
 
         AudioFragmentKey key = createKey(
                 AudioFragmentType.STATION,
-                id,
-                variant,
-                text,
+                fragment.id(),
+                fragment.variant(),
+                fragment.text(),
                 false
         );
 
@@ -237,6 +441,13 @@ public final class SequenceResolver {
         String id = readString(raw, "id", "");
         String variant = readString(raw, "variant", "default");
         String text = readString(raw, "text", "");
+
+        if (text.isBlank() && !id.isBlank()) {
+            LineConfig line = StationLineConfigStore.line(id).orElse(null);
+            if (line != null) {
+                text = localized(line.getReading(), line.getDisplay(), id);
+            }
+        }
 
         if (id.isBlank() || text.isBlank()) {
             return;
@@ -251,6 +462,83 @@ public final class SequenceResolver {
         );
 
         futures.add(audioCache.resolveOrGenerate(key));
+    }
+
+    private void resolveTransferLines(
+            AnnouncementResolveContext context,
+            List<CompletableFuture<AudioFragmentResult>> futures
+    ) {
+        if (context == null || context.transferLines().isEmpty()) {
+            return;
+        }
+
+        for (LineConfig line : context.transferLines()) {
+            String text = localized(line.getReading(), line.getDisplay(), line.getId());
+            if (line.getId().isBlank() || text.isBlank()) {
+                continue;
+            }
+
+            AudioFragmentKey key = createKey(
+                    AudioFragmentType.LINE,
+                    line.getId(),
+                    "bare",
+                    text,
+                    false
+            );
+
+            futures.add(audioCache.resolveOrGenerate(key));
+        }
+    }
+
+    private void resolveDoorSidePhrase(
+            AnnouncementResolveContext context,
+            List<CompletableFuture<AudioFragmentResult>> futures
+    ) {
+        String phraseId = doorSidePhraseId(context);
+        if (phraseId.isBlank()) {
+            return;
+        }
+
+        PhraseEntry entry = VoicePackManager.phrases().get(phraseId).orElse(null);
+        if (entry == null) {
+            return;
+        }
+
+        AudioFragmentKey key = createKey(
+                AudioFragmentType.COMMON,
+                entry.id(),
+                "default",
+                entry.text(),
+                entry.ssml()
+        );
+
+        futures.add(audioCache.resolveOrGenerate(key));
+    }
+
+    private StationFragment stationFragment(JsonObject raw, AnnouncementResolveContext context) {
+        String id = readString(raw, "id", "");
+        String variant = readString(raw, "variant", "default");
+        String text = readString(raw, "text", "");
+
+        if (text.isBlank() && context != null && context.station() != null) {
+            StationConfig station = context.station();
+
+            if (id.isBlank()) {
+                id = station.getCustomId();
+            }
+
+            text = localized(station.getReading(), station.getDisplay(), station.getCustomId());
+
+            if ("desu".equalsIgnoreCase(variant)) {
+                text = text + "です";
+            }
+        }
+
+        if (id.isBlank() || text.isBlank()) {
+            return null;
+        }
+
+        return new StationFragment(id, variant, text);
     }
 
     private AudioFragmentKey createKey(
@@ -274,26 +562,10 @@ public final class SequenceResolver {
         );
     }
 
-    private static TtsBackend readBackend() {
-        String value = ClientConfig.TTS_BACKEND.get().trim().toUpperCase(Locale.ROOT);
-        try {
-            return TtsBackend.valueOf(value);
-        } catch (IllegalArgumentException e) {
-            return TtsBackend.AUTO;
-        }
-    }
-
-    private static String readString(JsonObject object, String key, String fallback) {
-        if (!object.has(key) || object.get(key).isJsonNull()) {
-            return fallback;
-        }
-        return object.get(key).getAsString();
-    }
-
-    private static int readInt(JsonObject object, String key, int fallback) {
-        if (!object.has(key) || object.get(key).isJsonNull()) {
-            return fallback;
-        }
-        return object.get(key).getAsInt();
+    private record StationFragment(
+            String id,
+            String variant,
+            String text
+    ) {
     }
 }

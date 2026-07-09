@@ -44,11 +44,6 @@ public record AnnouncementPacket(
                 }
             };
 
-    @Override
-    public Type<? extends CustomPacketPayload> type() {
-        return TYPE;
-    }
-
     private static AnnouncementPacket read(RegistryFriendlyByteBuf buffer) {
         UUID announcementId = buffer.readUUID();
         AnnouncementEventType eventType = buffer.readEnum(AnnouncementEventType.class);
@@ -102,5 +97,10 @@ public record AnnouncementPacket(
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

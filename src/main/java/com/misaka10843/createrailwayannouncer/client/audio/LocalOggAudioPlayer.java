@@ -14,11 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class LocalOggAudioPlayer {
@@ -29,6 +25,44 @@ public final class LocalOggAudioPlayer {
     });
 
     private final Set<ActiveSound> activeSounds = ConcurrentHashMap.newKeySet();
+
+    private static void freeStbPcm(ShortBuffer pcm) {
+        if (pcm == null) {
+            return;
+        }
+
+        try {
+            LibCStdlib.nfree(MemoryUtil.memAddress(pcm));
+        } catch (Throwable t) {
+            CreateRailwayAnnouncer.LOGGER.warn("Failed to free STB decoded PCM buffer safely", t);
+        }
+    }
+
+    private static void safeDeleteSource(int source) {
+        try {
+            AL10.alSourceStop(source);
+            AL10.alDeleteSources(source);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void safeDeleteBuffer(int buffer) {
+        try {
+            AL10.alDeleteBuffers(buffer);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void checkAlError(String stage) {
+        int error = AL10.alGetError();
+        if (error != AL10.AL_NO_ERROR) {
+            throw new IllegalStateException(stage + " OpenAL error: " + error);
+        }
+    }
+
+    private static float clampGain(float gain) {
+        return Math.max(0.0F, Math.min(1.0F, gain));
+    }
 
     public CompletableFuture<Void> play(Path oggPath) {
         return play(oggPath, 1.0F, 150);
@@ -201,18 +235,6 @@ public final class LocalOggAudioPlayer {
         }
     }
 
-    private static void freeStbPcm(ShortBuffer pcm) {
-        if (pcm == null) {
-            return;
-        }
-
-        try {
-            LibCStdlib.nfree(MemoryUtil.memAddress(pcm));
-        } catch (Throwable t) {
-            CreateRailwayAnnouncer.LOGGER.warn("Failed to free STB decoded PCM buffer safely", t);
-        }
-    }
-
     private void schedulePoll(Minecraft minecraft, ActiveSound sound) {
         pollExecutor.schedule(() -> minecraft.execute(() -> {
             if (sound.future().isDone()) {
@@ -299,32 +321,6 @@ public final class LocalOggAudioPlayer {
         if (completeFuture && !sound.future().isDone()) {
             sound.future().complete(null);
         }
-    }
-
-    private static void safeDeleteSource(int source) {
-        try {
-            AL10.alSourceStop(source);
-            AL10.alDeleteSources(source);
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private static void safeDeleteBuffer(int buffer) {
-        try {
-            AL10.alDeleteBuffers(buffer);
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private static void checkAlError(String stage) {
-        int error = AL10.alGetError();
-        if (error != AL10.AL_NO_ERROR) {
-            throw new IllegalStateException(stage + " OpenAL error: " + error);
-        }
-    }
-
-    private static float clampGain(float gain) {
-        return Math.max(0.0F, Math.min(1.0F, gain));
     }
 
     private static final class ActiveSound {

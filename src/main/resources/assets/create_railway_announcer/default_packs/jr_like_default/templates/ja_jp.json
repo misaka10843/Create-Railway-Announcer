@@ -4,120 +4,86 @@
     "channel": "ONBOARD_VOICE",
     "priority": 70,
     "sequence": [
-      {
-        "type": "phrase",
-        "id": "common.next_is"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 420
-      },
-      {
-        "type": "station",
-        "id": "yurakucho",
-        "variant": "bare",
-        "text": "有楽町"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 260
-      },
-      {
-        "type": "station",
-        "id": "yurakucho",
-        "variant": "desu",
-        "text": "有楽町です"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 420
-      },
-      {
-        "type": "phrase",
-        "id": "common.door_left"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 500
-      },
-      {
-        "type": "line",
-        "id": "hibiya_line",
-        "variant": "bare",
-        "text": "地下鉄日比谷線"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 180
-      },
-      {
-        "type": "line",
-        "id": "yurakucho_line",
-        "variant": "bare",
-        "text": "地下鉄有楽町線"
-      },
-      {
-        "type": "phrase",
-        "id": "common.transfer_suffix"
-      }
+      { "type": "phrase", "id": "common.next_is" },
+      { "type": "pause", "duration_ms": 420 },
+      { "type": "station", "id": "yurakucho", "variant": "bare", "text": "有楽町" },
+      { "type": "pause", "duration_ms": 260 },
+      { "type": "station", "id": "yurakucho", "variant": "desu", "text": "有楽町です" },
+      { "type": "pause", "duration_ms": 420 },
+      { "type": "phrase", "id": "common.door_left" },
+      { "type": "pause", "duration_ms": 500 },
+      { "type": "line", "id": "hibiya_line", "variant": "bare", "text": "地下鉄日比谷線" },
+      { "type": "pause", "duration_ms": 180 },
+      { "type": "line", "id": "yurakucho_line", "variant": "bare", "text": "地下鉄有楽町線" },
+      { "type": "phrase", "id": "common.transfer_suffix" }
     ]
   },
+
   "priority_low_test": {
     "event": "priority_low_test",
     "channel": "ONBOARD_VOICE",
     "priority": 30,
     "sequence": [
-      {
-        "type": "phrase",
-        "id": "common.next_is"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 300
-      },
-      {
-        "type": "station",
-        "id": "low_priority_station",
-        "variant": "desu",
-        "text": "低い優先度です"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 800
-      },
-      {
-        "type": "phrase",
-        "id": "common.door_left"
-      }
+      { "type": "phrase", "id": "common.next_is" },
+      { "type": "pause", "duration_ms": 300 },
+      { "type": "station", "id": "low_priority_station", "variant": "desu", "text": "低い優先度です" },
+      { "type": "pause", "duration_ms": 800 },
+      { "type": "phrase", "id": "common.door_left" }
     ]
   },
+
   "priority_high_test": {
     "event": "priority_high_test",
     "channel": "ONBOARD_VOICE",
     "priority": 90,
     "sequence": [
-      {
-        "type": "phrase",
-        "id": "platform.door_closing"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 500
-      },
-      {
-        "type": "station",
-        "id": "high_priority_station",
-        "variant": "desu",
-        "text": "高い優先度です"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 800
-      },
-      {
-        "type": "phrase",
-        "id": "common.mind_belongings"
-      }
+      { "type": "phrase", "id": "platform.door_closing" },
+      { "type": "pause", "duration_ms": 500 },
+      { "type": "station", "id": "high_priority_station", "variant": "desu", "text": "高い優先度です" },
+      { "type": "pause", "duration_ms": 800 },
+      { "type": "phrase", "id": "common.mind_belongings" }
+    ]
+  },
+
+  "onboard_next_stop_dynamic": {
+    "event": "onboard_next_stop",
+    "channel": "ONBOARD_VOICE",
+    "priority": 70,
+    "sequence": [
+      { "type": "subtitle", "text": "次は {station}" },
+      { "type": "phrase", "id": "common.next_is" },
+      { "type": "pause", "duration_ms": 420 },
+      { "type": "station", "variant": "bare" },
+      { "type": "pause", "duration_ms": 260 },
+      { "type": "station", "variant": "desu" },
+      { "type": "pause", "duration_ms": 420 },
+      { "type": "door_side_phrase" },
+      { "type": "pause", "duration_ms": 500 },
+      { "type": "transfer_lines", "pause_ms_between": 180, "include_suffix": true }
+    ]
+  },
+
+  "platform_door_closing_dynamic": {
+    "event": "platform_door_closing",
+    "channel": "PLATFORM_VOICE",
+    "priority": 90,
+    "sequence": [
+      { "type": "subtitle", "text": "{station}：ドアが閉まります" },
+      { "type": "phrase", "id": "platform.door_closing" },
+      { "type": "pause", "duration_ms": 500 },
+      { "type": "phrase", "id": "common.mind_belongings" }
+    ]
+  },
+
+  "onboard_door_closing_dynamic": {
+    "event": "door_closing",
+    "channel": "ONBOARD_VOICE",
+    "priority": 90,
+    "sequence": [
+      { "type": "subtitle", "text": "{station}：ドアが閉まります" },
+      { "type": "phrase", "id": "platform.door_closing" },
+      { "type": "pause", "duration_ms": 500 },
+      { "type": "phrase", "id": "common.mind_belongings" }
     ]
   }
 }

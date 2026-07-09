@@ -1,59 +1,64 @@
 package com.misaka10843.createrailwayannouncer.command;
 
 import com.misaka10843.createrailwayannouncer.CreateRailwayAnnouncer;
+import com.misaka10843.createrailwayannouncer.announcement.AnnouncementEventType;
+import com.misaka10843.createrailwayannouncer.announcement.ServerAnnouncementCooldown;
+import com.misaka10843.createrailwayannouncer.announcement.ServerAnnouncementDispatcher;
+import com.misaka10843.createrailwayannouncer.announcement.ServerAnnouncementRequest;
 import com.misaka10843.createrailwayannouncer.audio.*;
-import com.misaka10843.createrailwayannouncer.config.ClientConfig;
-import com.misaka10843.createrailwayannouncer.tts.BridgeProcessResult;
-import com.misaka10843.createrailwayannouncer.tts.TtsBackend;
-import com.misaka10843.createrailwayannouncer.tts.TtsRequest;
-import com.misaka10843.createrailwayannouncer.tts.TtsResult;
-import com.misaka10843.createrailwayannouncer.tts.WindowsBridgeTtsProvider;
-import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.StringArgumentType;
-import net.minecraft.ChatFormatting;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
-import net.neoforged.fml.loading.FMLPaths;
-import com.misaka10843.createrailwayannouncer.pack.PhraseEntry;
-import com.misaka10843.createrailwayannouncer.pack.VoicePackLoader;
-import com.misaka10843.createrailwayannouncer.pack.VoicePackManager;
-import com.misaka10843.createrailwayannouncer.sequence.SequenceResolver;
-import com.misaka10843.createrailwayannouncer.sequence.SequenceTemplate;
-import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequence;
-import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequenceItem;
-import com.misaka10843.createrailwayannouncer.playback.LoggingSequenceAudioBackend;
-import com.misaka10843.createrailwayannouncer.playback.PlaybackScheduler;
-import com.misaka10843.createrailwayannouncer.playback.SequenceAudioBackend;
-import com.misaka10843.createrailwayannouncer.playback.PlaybackManager;
-import com.misaka10843.createrailwayannouncer.playback.PlaybackSession;
-import com.misaka10843.createrailwayannouncer.playback.PlaybackStartResult;
 import com.misaka10843.createrailwayannouncer.client.runtime.AnnouncementPlaybackRequest;
 import com.misaka10843.createrailwayannouncer.client.runtime.ClientAnnouncementRuntime;
 import com.misaka10843.createrailwayannouncer.client.runtime.ClientAnnouncementServices;
-import com.misaka10843.createrailwayannouncer.playback.PlaybackStartDecision;
-import com.misaka10843.createrailwayannouncer.announcement.AnnouncementEventType;
-import com.misaka10843.createrailwayannouncer.network.AnnouncementPacket;
+import com.misaka10843.createrailwayannouncer.config.ClientConfig;
+import com.misaka10843.createrailwayannouncer.config.LineConfig;
+import com.misaka10843.createrailwayannouncer.config.StationConfig;
+import com.misaka10843.createrailwayannouncer.config.StationLineConfigStore;
+import com.misaka10843.createrailwayannouncer.pack.PhraseEntry;
+import com.misaka10843.createrailwayannouncer.pack.VoicePackLoader;
+import com.misaka10843.createrailwayannouncer.pack.VoicePackManager;
+import com.misaka10843.createrailwayannouncer.playback.LoggingSequenceAudioBackend;
+import com.misaka10843.createrailwayannouncer.playback.PlaybackScheduler;
+import com.misaka10843.createrailwayannouncer.playback.PlaybackSession;
+import com.misaka10843.createrailwayannouncer.playback.SequenceAudioBackend;
+import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequence;
+import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequenceItem;
+import com.misaka10843.createrailwayannouncer.sequence.SequenceResolver;
+import com.misaka10843.createrailwayannouncer.sequence.SequenceTemplate;
+import com.misaka10843.createrailwayannouncer.tts.BridgeProcessResult;
+import com.misaka10843.createrailwayannouncer.tts.TtsBackend;
+import com.misaka10843.createrailwayannouncer.tts.TtsRequest;
+import com.misaka10843.createrailwayannouncer.tts.WindowsBridgeTtsProvider;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
-
-import java.util.UUID;
+import net.neoforged.fml.loading.FMLPaths;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public final class CreateRailwayAnnouncerCommands {
     private static final WindowsBridgeTtsProvider WINDOWS_TTS = new WindowsBridgeTtsProvider();
-
+    private static final PlaybackScheduler PLAYBACK_SCHEDULER = new PlaybackScheduler();
+    private static final UUID DEBUG_TRAIN_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000101");
+    private static final UUID DEBUG_STATION_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000201");
     private static AudioCache audioCache;
     private static SequenceResolver sequenceResolver;
 
-    private static final PlaybackScheduler PLAYBACK_SCHEDULER = new PlaybackScheduler();
+    private CreateRailwayAnnouncerCommands() {
+    }
 
     private static AudioCache audioCache() {
         if (audioCache == null) {
@@ -67,9 +72,6 @@ public final class CreateRailwayAnnouncerCommands {
             sequenceResolver = new SequenceResolver(audioCache());
         }
         return sequenceResolver;
-    }
-
-    private CreateRailwayAnnouncerCommands() {
     }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -201,6 +203,11 @@ public final class CreateRailwayAnnouncerCommands {
                                                 context.getSource(),
                                                 AnnouncementEventType.PLATFORM_DOOR_CLOSING
                                         )))
+                                .then(Commands.literal("send_packet_onboard_door_closing")
+                                        .executes(context -> sendAnnouncementPacket(
+                                                context.getSource(),
+                                                AnnouncementEventType.DOOR_CLOSING
+                                        )))
                                 .then(Commands.literal("play")
                                         .then(Commands.argument("id", StringArgumentType.word())
                                                 .executes(context -> announcePlay(
@@ -211,9 +218,197 @@ public final class CreateRailwayAnnouncerCommands {
                                         .executes(context -> stopPlayback(context.getSource())))
                                 .then(Commands.literal("status")
                                         .executes(context -> playbackStatus(context.getSource())))
+                                .then(Commands.literal("cooldown_clear")
+                                        .executes(context -> clearAnnouncementCooldown(context.getSource())))
+                                .then(Commands.literal("cooldown_info")
+                                        .executes(context -> announcementCooldownInfo(context.getSource())))
+                                .then(Commands.literal("send_packet_next_stop_far")
+                                        .executes(context -> sendFarAnnouncementPacket(
+                                                context.getSource(),
+                                                AnnouncementEventType.ONBOARD_NEXT_STOP
+                                        )))
+                        )
+                        .then(Commands.literal("data")
+                                .then(Commands.literal("reload")
+                                        .executes(context -> reloadData(context.getSource())))
+                                .then(Commands.literal("info")
+                                        .executes(context -> dataInfo(context.getSource())))
+                                .then(Commands.literal("station")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> showStationData(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("line")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> showLineData(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
                         )
 
         );
+    }
+
+    private static int clearAnnouncementCooldown(CommandSourceStack source) {
+        int cleared = ServerAnnouncementCooldown.clear();
+
+        source.sendSuccess(() -> Component.literal(
+                "Announcement cooldown cleared. entries=" + cleared
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int announcementCooldownInfo(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal(
+                "Announcement cooldown entries="
+                        + ServerAnnouncementCooldown.size()
+                        + ", cooldownTicks="
+                        + com.misaka10843.createrailwayannouncer.config.ServerConfig.ANNOUNCEMENT_COOLDOWN_TICKS.get()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int sendFarAnnouncementPacket(
+            CommandSourceStack source,
+            AnnouncementEventType eventType
+    ) throws CommandSyntaxException {
+        source.getPlayerOrException();
+
+        ServerLevel level = source.getLevel();
+
+        int priority = priorityFor(eventType);
+        AudioChannel channel = channelFor(eventType);
+
+        BlockPos sourcePos = BlockPos.containing(source.getPosition());
+        BlockPos farPos = sourcePos.offset(512, 0, 512);
+
+        ServerAnnouncementRequest request = ServerAnnouncementRequest.of(
+                eventType,
+                DEBUG_TRAIN_ID,
+                "debug_train_far",
+                DEBUG_STATION_ID,
+                farPos,
+                "debug_current_station",
+                "yurakucho",
+                "debug_destination_station",
+                channel,
+                priority
+        );
+
+        ServerAnnouncementDispatcher.DispatchResult result =
+                ServerAnnouncementDispatcher.dispatchToNearbyPlayers(level, request);
+
+        if (!result.accepted()) {
+            if (result.suppressed()) {
+                source.sendSuccess(() -> Component.literal(
+                        "Far announcement suppressed by cooldown: event="
+                                + eventType
+                                + ", remainingTicks="
+                                + result.remainingCooldownTicks()
+                ).withStyle(ChatFormatting.YELLOW), false);
+                return 1;
+            }
+
+            source.sendFailure(Component.literal(
+                    "Far announcement dispatch rejected: " + result.message()
+            ));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Dispatched far announcement: event="
+                        + eventType
+                        + ", center="
+                        + farPos
+                        + ", range="
+                        + result.horizontalRange()
+                        + "x"
+                        + result.verticalRange()
+                        + ", players="
+                        + result.sentPlayers()
+                        + ". Expected players=0 unless someone is near that position."
+        ).withStyle(ChatFormatting.YELLOW), false);
+
+        return 1;
+    }
+
+    private static int reloadData(CommandSourceStack source) {
+        StationLineConfigStore.reload();
+
+        source.sendSuccess(() -> Component.literal(
+                "Station data reloaded. stations="
+                        + StationLineConfigStore.stations().size()
+                        + ", lines="
+                        + StationLineConfigStore.lines().size()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int dataInfo(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal(
+                "Station data: stations="
+                        + StationLineConfigStore.stations().size()
+                        + ", lines="
+                        + StationLineConfigStore.lines().size()
+                        + ", path="
+                        + StationLineConfigStore.root()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int showStationData(CommandSourceStack source, String id) {
+        StationConfig station = StationLineConfigStore.station(id).orElse(null);
+
+        if (station == null) {
+            source.sendFailure(Component.literal("Station not found: " + id));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Station: "
+                        + station.getCustomId()
+                        + ", enabled="
+                        + station.isEnabled()
+                        + ", display.ja_jp="
+                        + station.getDisplay().getOrDefault("ja_jp", "")
+                        + ", reading.ja_jp="
+                        + station.getReading().getOrDefault("ja_jp", "")
+                        + ", doorSide="
+                        + station.getDoorSide()
+                        + ", platform="
+                        + station.getPlatform()
+                        + ", transfers="
+                        + station.getTransferLineIds()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int showLineData(CommandSourceStack source, String id) {
+        LineConfig line = StationLineConfigStore.line(id).orElse(null);
+
+        if (line == null) {
+            source.sendFailure(Component.literal("Line not found: " + id));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Line: "
+                        + line.getId()
+                        + ", display.ja_jp="
+                        + line.getDisplay().getOrDefault("ja_jp", "")
+                        + ", reading.ja_jp="
+                        + line.getReading().getOrDefault("ja_jp", "")
+                        + ", short.ja_jp="
+                        + line.getShortName().getOrDefault("ja_jp", "")
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
     }
 
     private static int sendAnnouncementPacket(
@@ -221,51 +416,108 @@ public final class CreateRailwayAnnouncerCommands {
             AnnouncementEventType eventType
     ) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
+        ServerLevel level = source.getLevel();
 
-        int priority = switch (eventType) {
-            case PLATFORM_DOOR_CLOSING, DOOR_CLOSING, SAFETY_NOTICE -> 90;
-            default -> 70;
-        };
-
-        AudioChannel channel = switch (eventType) {
-            case PLATFORM_DOOR_CLOSING, PLATFORM_APPROACH, PLATFORM_ARRIVAL,
-                 PLATFORM_PRE_DEPARTURE, PLATFORM_DEPARTED -> AudioChannel.PLATFORM_VOICE;
-            case PLATFORM_DEPARTURE_MELODY -> AudioChannel.MELODY;
-            case DOOR_CLOSING, DOOR_OPENING -> AudioChannel.DOOR_CHIME;
-            default -> AudioChannel.ONBOARD_VOICE;
-        };
-
+        int priority = priorityFor(eventType);
+        AudioChannel channel = channelFor(eventType);
         BlockPos pos = BlockPos.containing(source.getPosition());
 
-        AnnouncementPacket packet = new AnnouncementPacket(
-                UUID.randomUUID(),
+        ServerAnnouncementRequest request = ServerAnnouncementRequest.of(
                 eventType,
-                UUID.randomUUID(),
+                DEBUG_TRAIN_ID,
                 "debug_train",
-                UUID.randomUUID(),
+                DEBUG_STATION_ID,
                 pos,
                 "debug_current_station",
                 "yurakucho",
                 "debug_destination_station",
-                64,
-                24,
                 channel,
-                priority,
-                source.getLevel().getGameTime()
+                priority
         );
 
-        PacketDistributor.sendToPlayer(player, packet);
+        ServerAnnouncementDispatcher.DispatchResult result =
+                ServerAnnouncementDispatcher.dispatchToNearbyPlayers(level, request);
+
+        if (!result.accepted()) {
+            if (result.suppressed()) {
+                source.sendSuccess(() -> Component.literal(
+                        "Announcement suppressed by cooldown: event="
+                                + eventType
+                                + ", remainingTicks="
+                                + result.remainingCooldownTicks()
+                                + ", remainingSeconds="
+                                + String.format("%.1f", result.remainingCooldownTicks() / 20.0D)
+                ).withStyle(ChatFormatting.YELLOW), false);
+                return 1;
+            }
+
+            source.sendFailure(Component.literal(
+                    "Announcement dispatch rejected: " + result.message()
+            ));
+            return 0;
+        }
 
         source.sendSuccess(() -> Component.literal(
-                "Sent announcement packet to client: event="
+                "Dispatched announcement: event="
                         + eventType
                         + ", channel="
                         + channel
                         + ", priority="
                         + priority
+                        + ", range="
+                        + result.horizontalRange()
+                        + "x"
+                        + result.verticalRange()
+                        + ", players="
+                        + result.sentPlayers()
+                        + ", selfInRange="
+                        + isPlayerInRangeForDebug(player, pos, result.horizontalRange(), result.verticalRange())
         ).withStyle(ChatFormatting.GREEN), false);
 
         return 1;
+    }
+
+    private static int priorityFor(AnnouncementEventType eventType) {
+        return switch (eventType) {
+            case PLATFORM_DOOR_CLOSING, DOOR_CLOSING, SAFETY_NOTICE -> 90;
+            case PLATFORM_DEPARTURE_MELODY -> 75;
+            default -> 70;
+        };
+    }
+
+    private static AudioChannel channelFor(AnnouncementEventType eventType) {
+        return switch (eventType) {
+            case PLATFORM_DOOR_CLOSING,
+                 PLATFORM_APPROACH,
+                 PLATFORM_ARRIVAL,
+                 PLATFORM_PRE_DEPARTURE,
+                 PLATFORM_DEPARTED -> AudioChannel.PLATFORM_VOICE;
+
+            case PLATFORM_DEPARTURE_MELODY -> AudioChannel.MELODY;
+
+            case DOOR_OPENING -> AudioChannel.DOOR_CHIME;
+
+            case DOOR_CLOSING -> AudioChannel.ONBOARD_VOICE;
+
+            default -> AudioChannel.ONBOARD_VOICE;
+        };
+    }
+
+    private static boolean isPlayerInRangeForDebug(
+            ServerPlayer player,
+            BlockPos center,
+            int horizontalRange,
+            int verticalRange
+    ) {
+        BlockPos playerPos = player.blockPosition();
+
+        int dx = Math.abs(playerPos.getX() - center.getX());
+        int dz = Math.abs(playerPos.getZ() - center.getZ());
+        int dy = Math.abs(playerPos.getY() - center.getY());
+
+        return dx <= horizontalRange
+                && dz <= horizontalRange
+                && dy <= verticalRange;
     }
 
     private static int announcePlay(CommandSourceStack source, String sequenceId) {

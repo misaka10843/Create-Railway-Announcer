@@ -1,22 +1,18 @@
 package com.misaka10843.createrailwayannouncer.config;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public class StationConfig {
+    private final Map<String, String> display = new HashMap<>();
+    private final Map<String, String> reading = new HashMap<>();
+    private final List<String> transferLineIds = new ArrayList<>();
     private UUID createStationId;
     private String customId = "";
     private boolean enabled = true;
-    private final Map<String, String> display = new HashMap<>();
-    private final Map<String, String> reading = new HashMap<>();
     private DoorSide doorSide = DoorSide.NONE;
     private String platform = "1";
     private int horizontalRange = ServerConfig.DEFAULT_STATION_HORIZONTAL_RANGE.get();
     private int verticalRange = ServerConfig.DEFAULT_STATION_VERTICAL_RANGE.get();
-    private final List<String> transferLineIds = new ArrayList<>();
 
     public UUID getCreateStationId() {
         return createStationId;
