@@ -10,6 +10,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import com.misaka10843.createrailwayannouncer.command.CreateRailwayAnnouncerCommands;
 import com.misaka10843.createrailwayannouncer.pack.VoicePackLoader;
+import com.misaka10843.createrailwayannouncer.network.CreateRailwayAnnouncerNetworking;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -23,7 +24,10 @@ public class CreateRailwayAnnouncer {
 
     public CreateRailwayAnnouncer(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(CreateRailwayAnnouncerNetworking::register);
+
         NeoForge.EVENT_BUS.register(this);
+
         modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC);
         modContainer.registerConfig(ModConfig.Type.SERVER, ServerConfig.SPEC);
     }

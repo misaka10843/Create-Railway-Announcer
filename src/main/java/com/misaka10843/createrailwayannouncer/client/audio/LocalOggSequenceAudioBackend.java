@@ -7,7 +7,6 @@ import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequence;
 import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequenceItem;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 
 import java.util.concurrent.CompletableFuture;
@@ -19,11 +18,9 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
     private static final int ITEM_FADE_IN_MS = 0;
 
     private final LocalOggAudioPlayer player = new LocalOggAudioPlayer();
-    private final CommandSourceStack source;
     private final AtomicBoolean firstPlayableItem = new AtomicBoolean(true);
 
-    public LocalOggSequenceAudioBackend(CommandSourceStack source) {
-        this.source = source;
+    public LocalOggSequenceAudioBackend() {
     }
 
     @Override
@@ -35,21 +32,22 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
     public void onSequenceStart(ResolvedSequence sequence) {
         firstPlayableItem.set(true);
 
-        String message = "Local OGG playback started: " + sequence.id()
-                + ", channel=" + sequence.channel()
-                + ", priority=" + sequence.priority()
-                + ", items=" + sequence.items().size();
-
-        CreateRailwayAnnouncer.LOGGER.info(message);
-        source.sendSuccess(() -> Component.literal(message).withStyle(ChatFormatting.GREEN), false);
+        CreateRailwayAnnouncer.LOGGER.info(
+                "Local OGG playback started: {}, channel={}, priority={}, items={}",
+                sequence.id(),
+                sequence.channel(),
+                sequence.priority(),
+                sequence.items().size()
+        );
     }
 
     @Override
     public void onSequenceEnd(ResolvedSequence sequence, PlaybackState state) {
-        String message = "Local OGG playback ended: " + sequence.id() + ", state=" + state;
-
-        CreateRailwayAnnouncer.LOGGER.info(message);
-        source.sendSuccess(() -> Component.literal(message).withStyle(ChatFormatting.GREEN), false);
+        CreateRailwayAnnouncer.LOGGER.info(
+                "Local OGG playback ended: {}, state={}",
+                sequence.id(),
+                state
+        );
     }
 
     @Override
@@ -59,12 +57,16 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
         int fadeInMs = firstPlayableItem.getAndSet(false)
                 ? SESSION_FADE_IN_MS
                 : ITEM_FADE_IN_MS;
+
         float gain = gainFor(sequence);
 
         return player.play(item.audioPath(), gain, fadeInMs).whenComplete((ignored, throwable) -> {
             if (throwable != null) {
-                CreateRailwayAnnouncer.LOGGER.error("Local OGG audio playback failed: {}", item.audioPath(), throwable);
-                source.sendFailure(Component.literal("Audio playback failed: " + throwable.getMessage()));
+                CreateRailwayAnnouncer.LOGGER.error(
+                        "Local OGG audio playback failed: {}",
+                        item.audioPath(),
+                        throwable
+                );
             }
         });
     }
@@ -81,8 +83,11 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
 
         return player.play(item.audioPath(), gain, fadeInMs).whenComplete((ignored, throwable) -> {
             if (throwable != null) {
-                CreateRailwayAnnouncer.LOGGER.error("Local OGG sound playback failed: {}", item.audioPath(), throwable);
-                source.sendFailure(Component.literal("Sound playback failed: " + throwable.getMessage()));
+                CreateRailwayAnnouncer.LOGGER.error(
+                        "Local OGG sound playback failed: {}",
+                        item.audioPath(),
+                        throwable
+                );
             }
         });
     }

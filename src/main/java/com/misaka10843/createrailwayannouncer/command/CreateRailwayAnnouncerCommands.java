@@ -28,6 +28,18 @@ import com.misaka10843.createrailwayannouncer.playback.SequenceAudioBackend;
 import com.misaka10843.createrailwayannouncer.playback.PlaybackManager;
 import com.misaka10843.createrailwayannouncer.playback.PlaybackSession;
 import com.misaka10843.createrailwayannouncer.playback.PlaybackStartResult;
+import com.misaka10843.createrailwayannouncer.client.runtime.AnnouncementPlaybackRequest;
+import com.misaka10843.createrailwayannouncer.client.runtime.ClientAnnouncementRuntime;
+import com.misaka10843.createrailwayannouncer.client.runtime.ClientAnnouncementServices;
+import com.misaka10843.createrailwayannouncer.playback.PlaybackStartDecision;
+import com.misaka10843.createrailwayannouncer.announcement.AnnouncementEventType;
+import com.misaka10843.createrailwayannouncer.network.AnnouncementPacket;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
+
+import java.util.UUID;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,7 +54,6 @@ public final class CreateRailwayAnnouncerCommands {
     private static SequenceResolver sequenceResolver;
 
     private static final PlaybackScheduler PLAYBACK_SCHEDULER = new PlaybackScheduler();
-    private static final PlaybackManager PLAYBACK_MANAGER = new PlaybackManager();
 
     private static AudioCache audioCache() {
         if (audioCache == null) {
@@ -174,47 +185,141 @@ public final class CreateRailwayAnnouncerCommands {
                                 .then(Commands.literal("status")
                                         .executes(context -> playbackStatus(context.getSource())))
                         )
+                        .then(Commands.literal("announce")
+                                .then(Commands.literal("test_next_stop")
+                                        .executes(context -> announcePlay(
+                                                context.getSource(),
+                                                "onboard_next_stop_test"
+                                        )))
+                                .then(Commands.literal("send_packet_next_stop")
+                                        .executes(context -> sendAnnouncementPacket(
+                                                context.getSource(),
+                                                AnnouncementEventType.ONBOARD_NEXT_STOP
+                                        )))
+                                .then(Commands.literal("send_packet_door_closing")
+                                        .executes(context -> sendAnnouncementPacket(
+                                                context.getSource(),
+                                                AnnouncementEventType.PLATFORM_DOOR_CLOSING
+                                        )))
+                                .then(Commands.literal("play")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> announcePlay(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("stop")
+                                        .executes(context -> stopPlayback(context.getSource())))
+                                .then(Commands.literal("status")
+                                        .executes(context -> playbackStatus(context.getSource())))
+                        )
+
         );
     }
 
-    private static int playSequence(CommandSourceStack source, String sequenceId) {
-        SequenceTemplate template = VoicePackManager.sequences().get(sequenceId).orElse(null);
+    private static int sendAnnouncementPacket(
+            CommandSourceStack source,
+            AnnouncementEventType eventType
+    ) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
 
-        if (template == null) {
-            source.sendFailure(Component.literal("Sequence not found: " + sequenceId + ". Use /cra pack reload first."));
-            return 0;
-        }
+        int priority = switch (eventType) {
+            case PLATFORM_DOOR_CLOSING, DOOR_CLOSING, SAFETY_NOTICE -> 90;
+            default -> 70;
+        };
 
-        SequenceAudioBackend backend = createLocalOggBackend(source);
-        if (backend == null) {
-            source.sendFailure(Component.literal("Local OGG backend is not available on this side."));
-            return 0;
-        }
+        AudioChannel channel = switch (eventType) {
+            case PLATFORM_DOOR_CLOSING, PLATFORM_APPROACH, PLATFORM_ARRIVAL,
+                 PLATFORM_PRE_DEPARTURE, PLATFORM_DEPARTED -> AudioChannel.PLATFORM_VOICE;
+            case PLATFORM_DEPARTURE_MELODY -> AudioChannel.MELODY;
+            case DOOR_CLOSING, DOOR_OPENING -> AudioChannel.DOOR_CHIME;
+            default -> AudioChannel.ONBOARD_VOICE;
+        };
+
+        BlockPos pos = BlockPos.containing(source.getPosition());
+
+        AnnouncementPacket packet = new AnnouncementPacket(
+                UUID.randomUUID(),
+                eventType,
+                UUID.randomUUID(),
+                "debug_train",
+                UUID.randomUUID(),
+                pos,
+                "debug_current_station",
+                "yurakucho",
+                "debug_destination_station",
+                64,
+                24,
+                channel,
+                priority,
+                source.getLevel().getGameTime()
+        );
+
+        PacketDistributor.sendToPlayer(player, packet);
 
         source.sendSuccess(() -> Component.literal(
-                "Resolving sequence for local OGG playback: " + template.id()
+                "Sent announcement packet to client: event="
+                        + eventType
+                        + ", channel="
+                        + channel
+                        + ", priority="
+                        + priority
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int announcePlay(CommandSourceStack source, String sequenceId) {
+        source.sendSuccess(() -> Component.literal(
+                "Submitting announcement playback request: " + sequenceId
         ).withStyle(ChatFormatting.GRAY), false);
 
-        sequenceResolver().resolveSequence(template).thenAccept(sequence -> {
-            PlaybackStartResult result = PLAYBACK_MANAGER.play(sequence, backend);
+        playAnnouncementRequest(source, AnnouncementPlaybackRequest.sequenceOnly(sequenceId));
+        return 1;
+    }
+
+    private static int playSequence(CommandSourceStack source, String sequenceId) {
+        source.sendSuccess(() -> Component.literal(
+                "Submitting sequence playback request: " + sequenceId
+        ).withStyle(ChatFormatting.GRAY), false);
+
+        playAnnouncementRequest(source, AnnouncementPlaybackRequest.sequenceOnly(sequenceId));
+        return 1;
+    }
+
+    private static void playAnnouncementRequest(
+            CommandSourceStack source,
+            AnnouncementPlaybackRequest request
+    ) {
+        ClientAnnouncementServices.runtime().play(request).whenComplete((result, throwable) -> {
+            if (throwable != null) {
+                source.sendFailure(Component.literal(
+                        "Announcement playback failed: " + throwable.getMessage()
+                ));
+                return;
+            }
+
+            if (result == null) {
+                source.sendFailure(Component.literal("Announcement playback failed: empty result."));
+                return;
+            }
 
             if (!result.accepted()) {
                 PlaybackSession previous = result.previous();
 
                 if (previous != null) {
                     source.sendSuccess(() -> Component.literal(
-                            "Playback rejected: active sequence has higher priority. "
+                            "Announcement rejected: active sequence has higher priority. "
                                     + "active="
                                     + previous.sequence().id()
                                     + ", activePriority="
                                     + previous.sequence().priority()
                                     + ", requested="
-                                    + sequence.id()
-                                    + ", requestedPriority="
-                                    + sequence.priority()
+                                    + request.sequenceId()
                     ).withStyle(ChatFormatting.YELLOW), false);
                 } else {
-                    source.sendFailure(Component.literal("Playback rejected: " + result.message()));
+                    source.sendFailure(Component.literal(
+                            "Announcement rejected: " + result.message()
+                    ));
                 }
 
                 return;
@@ -229,7 +334,7 @@ public final class CreateRailwayAnnouncerCommands {
             };
 
             source.sendSuccess(() -> Component.literal(
-                    "Playback session "
+                    "Announcement playback "
                             + action
                             + ": "
                             + session.id()
@@ -241,12 +346,10 @@ public final class CreateRailwayAnnouncerCommands {
                             + session.sequence().priority()
             ).withStyle(ChatFormatting.GREEN), false);
         });
-
-        return 1;
     }
 
     private static int stopPlayback(CommandSourceStack source) {
-        PLAYBACK_MANAGER.stopAll();
+        ClientAnnouncementRuntime.playbackManager().stopAll();
 
         source.sendSuccess(() -> Component.literal(
                 "Stopped all playback sessions."
@@ -256,7 +359,7 @@ public final class CreateRailwayAnnouncerCommands {
     }
 
     private static int playbackStatus(CommandSourceStack source) {
-        Map<AudioChannel, PlaybackSession> sessions = PLAYBACK_MANAGER.sessions();
+        Map<AudioChannel, PlaybackSession> sessions = ClientAnnouncementRuntime.playbackManager().sessions();
 
         if (sessions.isEmpty()) {
             source.sendSuccess(() -> Component.literal(
