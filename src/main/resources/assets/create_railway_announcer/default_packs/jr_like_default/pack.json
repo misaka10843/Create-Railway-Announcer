@@ -1,0 +1,12 @@
+{
+  "pack_format": 1,
+  "id": "jr_like_default",
+  "name": "JR-like Default Pack",
+  "description": "Japanese railway-style announcement templates. No official railway assets included.",
+  "author": "Create Railway Announcer",
+  "version": "0.1.0",
+  "default_language": "ja_jp",
+  "supported_languages": [
+    "ja_jp"
+  ]
+}

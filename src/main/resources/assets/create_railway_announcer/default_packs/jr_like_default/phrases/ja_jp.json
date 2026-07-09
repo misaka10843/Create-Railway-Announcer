@@ -1,0 +1,17 @@
+{
+  "common.next_is": "次は",
+  "common.soon_arriving": "まもなく",
+  "common.desu": "です",
+  "common.door_left": "お出口は左側です",
+  "common.door_right": "お出口は右側です",
+  "common.door_both": "お出口は両側です",
+  "common.transfer_suffix": "はお乗り換えです",
+  "common.terminal": "終点",
+  "common.mind_belongings": "お忘れ物のないようご注意ください",
+
+  "platform.soon": "まもなく",
+  "platform.track_ni": "番線に",
+  "platform.train_arriving": "電車がまいります",
+  "platform.keep_behind_line": "危ないですから黄色い線の内側までお下がりください",
+  "platform.door_closing": "ドアが閉まります。ご注意ください"
+}

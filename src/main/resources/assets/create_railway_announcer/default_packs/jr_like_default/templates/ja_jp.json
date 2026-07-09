@@ -1,0 +1,65 @@
+{
+  "onboard_next_stop_test": {
+    "event": "onboard_next_stop",
+    "channel": "ONBOARD_VOICE",
+    "priority": 70,
+    "sequence": [
+      {
+        "type": "phrase",
+        "id": "common.next_is"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 420
+      },
+      {
+        "type": "station",
+        "id": "yurakucho",
+        "variant": "bare",
+        "text": "有楽町"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 260
+      },
+      {
+        "type": "station",
+        "id": "yurakucho",
+        "variant": "desu",
+        "text": "有楽町です"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 420
+      },
+      {
+        "type": "phrase",
+        "id": "common.door_left"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 500
+      },
+      {
+        "type": "line",
+        "id": "hibiya_line",
+        "variant": "bare",
+        "text": "地下鉄日比谷線"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 180
+      },
+      {
+        "type": "line",
+        "id": "yurakucho_line",
+        "variant": "bare",
+        "text": "地下鉄有楽町線"
+      },
+      {
+        "type": "phrase",
+        "id": "common.transfer_suffix"
+      }
+    ]
+  }
+}

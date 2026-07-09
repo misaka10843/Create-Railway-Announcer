@@ -27,8 +27,9 @@ sourceSets.main.resources {
 }
 
 repositories {
-    maven { url = "https://maven.createmod.net" } // Create, Ponder, Flywheel
-    maven { url = "https://maven.ithundxr.dev/snapshots" } // Registrate
+    mavenCentral()
+    maven { url = "https://maven.createmod.net" }
+    maven { url = "https://maven.ithundxr.dev/snapshots" }
 }
 
 base {
@@ -124,6 +125,25 @@ dependencies {
     compileOnly("dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}")
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     implementation("com.tterrag.registrate:Registrate:${registrate_version}")
+    jarJar(implementation("ws.schild:jave-core:3.5.0")) {
+        version {
+            strictly "[3.5.0,3.6.0)"
+            prefer "3.5.0"
+        }
+    }
+
+    jarJar(implementation("ws.schild:jave-nativebin-win64:3.5.0")) {
+        version {
+            strictly "[3.5.0,3.6.0)"
+            prefer "3.5.0"
+        }
+    }
+
+// Required for NeoForge dev runs on MC 1.21.1.
+// Without this, Java libraries may compile and jarJar correctly,
+// but still be missing at runClient/runtime.
+    additionalRuntimeClasspath "ws.schild:jave-core:3.5.0"
+    additionalRuntimeClasspath "ws.schild:jave-nativebin-win64:3.5.0"
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

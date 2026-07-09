@@ -9,6 +9,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import com.misaka10843.createrailwayannouncer.command.CreateRailwayAnnouncerCommands;
+import com.misaka10843.createrailwayannouncer.pack.VoicePackLoader;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -32,5 +33,6 @@ public class CreateRailwayAnnouncer {
     }
     private void commonSetup(FMLCommonSetupEvent event) {
         LOGGER.info("{} common setup complete", NAME);
+        event.enqueueWork(VoicePackLoader::reloadDefaultPack);
     }
 }
