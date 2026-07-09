@@ -1,6 +1,7 @@
 package com.misaka10843.createrailwayannouncer.command;
 
 import com.misaka10843.createrailwayannouncer.CreateRailwayAnnouncer;
+import com.misaka10843.createrailwayannouncer.audio.*;
 import com.misaka10843.createrailwayannouncer.config.ClientConfig;
 import com.misaka10843.createrailwayannouncer.tts.BridgeProcessResult;
 import com.misaka10843.createrailwayannouncer.tts.TtsBackend;
@@ -14,19 +15,24 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.neoforged.fml.loading.FMLPaths;
-import com.misaka10843.createrailwayannouncer.audio.AudioCache;
-import com.misaka10843.createrailwayannouncer.audio.AudioFragmentKey;
-import com.misaka10843.createrailwayannouncer.audio.AudioFragmentType;
 import com.misaka10843.createrailwayannouncer.pack.PhraseEntry;
 import com.misaka10843.createrailwayannouncer.pack.VoicePackLoader;
 import com.misaka10843.createrailwayannouncer.pack.VoicePackManager;
 import com.misaka10843.createrailwayannouncer.sequence.SequenceResolver;
 import com.misaka10843.createrailwayannouncer.sequence.SequenceTemplate;
-import com.misaka10843.createrailwayannouncer.audio.AudioFragmentResult;
+import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequence;
+import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequenceItem;
+import com.misaka10843.createrailwayannouncer.playback.LoggingSequenceAudioBackend;
+import com.misaka10843.createrailwayannouncer.playback.PlaybackScheduler;
+import com.misaka10843.createrailwayannouncer.playback.SequenceAudioBackend;
+import com.misaka10843.createrailwayannouncer.playback.PlaybackManager;
+import com.misaka10843.createrailwayannouncer.playback.PlaybackSession;
+import com.misaka10843.createrailwayannouncer.playback.PlaybackStartResult;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 public final class CreateRailwayAnnouncerCommands {
@@ -34,6 +40,9 @@ public final class CreateRailwayAnnouncerCommands {
 
     private static AudioCache audioCache;
     private static SequenceResolver sequenceResolver;
+
+    private static final PlaybackScheduler PLAYBACK_SCHEDULER = new PlaybackScheduler();
+    private static final PlaybackManager PLAYBACK_MANAGER = new PlaybackManager();
 
     private static AudioCache audioCache() {
         if (audioCache == null) {
@@ -126,8 +135,254 @@ public final class CreateRailwayAnnouncerCommands {
                                                 .executes(context -> testSequence(
                                                         context.getSource(),
                                                         StringArgumentType.getString(context, "id")
-                                                )))))
+                                                ))))
+                                .then(Commands.literal("print")
+                                        .then(Commands.literal("test_next_stop")
+                                                .executes(context -> printSequence(
+                                                        context.getSource(),
+                                                        "onboard_next_stop_test"
+                                                )))
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> printSequence(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("dry_play")
+                                        .then(Commands.literal("test_next_stop")
+                                                .executes(context -> dryPlaySequence(
+                                                        context.getSource(),
+                                                        "onboard_next_stop_test"
+                                                )))
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> dryPlaySequence(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("play")
+                                        .then(Commands.literal("test_next_stop")
+                                                .executes(context -> playSequence(
+                                                        context.getSource(),
+                                                        "onboard_next_stop_test"
+                                                )))
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> playSequence(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("stop")
+                                        .executes(context -> stopPlayback(context.getSource())))
+                                .then(Commands.literal("status")
+                                        .executes(context -> playbackStatus(context.getSource())))
+                        )
         );
+    }
+
+    private static int playSequence(CommandSourceStack source, String sequenceId) {
+        SequenceTemplate template = VoicePackManager.sequences().get(sequenceId).orElse(null);
+
+        if (template == null) {
+            source.sendFailure(Component.literal("Sequence not found: " + sequenceId + ". Use /cra pack reload first."));
+            return 0;
+        }
+
+        SequenceAudioBackend backend = createLocalOggBackend(source);
+        if (backend == null) {
+            source.sendFailure(Component.literal("Local OGG backend is not available on this side."));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Resolving sequence for local OGG playback: " + template.id()
+        ).withStyle(ChatFormatting.GRAY), false);
+
+        sequenceResolver().resolveSequence(template).thenAccept(sequence -> {
+            PlaybackStartResult result = PLAYBACK_MANAGER.play(sequence, backend);
+
+            if (!result.accepted()) {
+                PlaybackSession previous = result.previous();
+
+                if (previous != null) {
+                    source.sendSuccess(() -> Component.literal(
+                            "Playback rejected: active sequence has higher priority. "
+                                    + "active="
+                                    + previous.sequence().id()
+                                    + ", activePriority="
+                                    + previous.sequence().priority()
+                                    + ", requested="
+                                    + sequence.id()
+                                    + ", requestedPriority="
+                                    + sequence.priority()
+                    ).withStyle(ChatFormatting.YELLOW), false);
+                } else {
+                    source.sendFailure(Component.literal("Playback rejected: " + result.message()));
+                }
+
+                return;
+            }
+
+            PlaybackSession session = result.session();
+
+            String action = switch (result.decision()) {
+                case STARTED -> "started";
+                case REPLACED -> "replaced previous session";
+                case REJECTED_LOWER_PRIORITY -> "rejected";
+            };
+
+            source.sendSuccess(() -> Component.literal(
+                    "Playback session "
+                            + action
+                            + ": "
+                            + session.id()
+                            + ", channel="
+                            + session.channel()
+                            + ", sequence="
+                            + session.sequence().id()
+                            + ", priority="
+                            + session.sequence().priority()
+            ).withStyle(ChatFormatting.GREEN), false);
+        });
+
+        return 1;
+    }
+
+    private static int stopPlayback(CommandSourceStack source) {
+        PLAYBACK_MANAGER.stopAll();
+
+        source.sendSuccess(() -> Component.literal(
+                "Stopped all playback sessions."
+        ).withStyle(ChatFormatting.YELLOW), false);
+
+        return 1;
+    }
+
+    private static int playbackStatus(CommandSourceStack source) {
+        Map<AudioChannel, PlaybackSession> sessions = PLAYBACK_MANAGER.sessions();
+
+        if (sessions.isEmpty()) {
+            source.sendSuccess(() -> Component.literal(
+                    "No active playback sessions."
+            ).withStyle(ChatFormatting.GRAY), false);
+            return 1;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Active playback sessions: " + sessions.size()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        for (Map.Entry<AudioChannel, PlaybackSession> entry : sessions.entrySet()) {
+            AudioChannel channel = entry.getKey();
+            PlaybackSession session = entry.getValue();
+
+            source.sendSuccess(() -> Component.literal(
+                    channel
+                            + " -> "
+                            + session.sequence().id()
+                            + ", priority="
+                            + session.sequence().priority()
+                            + ", state="
+                            + session.state()
+                            + ", id="
+                            + session.id()
+            ).withStyle(ChatFormatting.GRAY), false);
+        }
+
+        return 1;
+    }
+
+    private static SequenceAudioBackend createLocalOggBackend(CommandSourceStack source) {
+        try {
+            Class<?> clazz = Class.forName(
+                    "com.misaka10843.createrailwayannouncer.client.audio.LocalOggSequenceAudioBackend"
+            );
+
+            Object instance = clazz
+                    .getConstructor(CommandSourceStack.class)
+                    .newInstance(source);
+
+            return (SequenceAudioBackend) instance;
+        } catch (Throwable t) {
+            CreateRailwayAnnouncer.LOGGER.error("Failed to create local OGG playback backend", t);
+            return null;
+        }
+    }
+
+    private static int dryPlaySequence(CommandSourceStack source, String sequenceId) {
+        SequenceTemplate template = VoicePackManager.sequences().get(sequenceId).orElse(null);
+
+        if (template == null) {
+            source.sendFailure(Component.literal("Sequence not found: " + sequenceId + ". Use /cra pack reload first."));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Resolving sequence for dry playback: " + template.id()
+        ).withStyle(ChatFormatting.GRAY), false);
+
+        sequenceResolver().resolveSequence(template).thenAccept(sequence -> {
+            PLAYBACK_SCHEDULER.playDry(sequence, new LoggingSequenceAudioBackend(source));
+        });
+
+        return 1;
+    }
+
+    private static int printSequence(CommandSourceStack source, String sequenceId) {
+        SequenceTemplate template = VoicePackManager.sequences().get(sequenceId).orElse(null);
+
+        if (template == null) {
+            source.sendFailure(Component.literal("Sequence not found: " + sequenceId + ". Use /cra pack reload first."));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Resolving playback queue: " + template.id()
+        ).withStyle(ChatFormatting.GRAY), false);
+
+        sequenceResolver().resolveSequence(template).thenAccept(sequence -> {
+            printResolvedSequence(source, sequence);
+        });
+
+        return 1;
+    }
+
+    private static void printResolvedSequence(CommandSourceStack source, ResolvedSequence sequence) {
+        source.sendSuccess(() -> Component.literal(
+                "Resolved sequence: " + sequence.id()
+                        + ", channel=" + sequence.channel()
+                        + ", priority=" + sequence.priority()
+                        + ", items=" + sequence.items().size()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        int maxLines = Math.min(sequence.items().size(), 20);
+
+        for (int i = 0; i < maxLines; i++) {
+            ResolvedSequenceItem item = sequence.items().get(i);
+            int index = i;
+
+            switch (item.type()) {
+                case AUDIO -> source.sendSuccess(() -> Component.literal(
+                        "[" + index + "] AUDIO " + item.audioPath()
+                ).withStyle(ChatFormatting.GRAY), false);
+
+                case SOUND -> source.sendSuccess(() -> Component.literal(
+                        "[" + index + "] SOUND " + item.audioPath()
+                ).withStyle(ChatFormatting.GRAY), false);
+
+                case PAUSE -> source.sendSuccess(() -> Component.literal(
+                        "[" + index + "] PAUSE " + item.pauseMs() + "ms"
+                ).withStyle(ChatFormatting.GRAY), false);
+
+                case SUBTITLE -> source.sendSuccess(() -> Component.literal(
+                        "[" + index + "] SUBTITLE " + item.text()
+                ).withStyle(ChatFormatting.GRAY), false);
+            }
+        }
+
+        if (sequence.items().size() > maxLines) {
+            int remaining = sequence.items().size() - maxLines;
+            source.sendSuccess(() -> Component.literal(
+                    "... " + remaining + " more items"
+            ).withStyle(ChatFormatting.DARK_GRAY), false);
+        }
     }
 
     private static int testSequence(CommandSourceStack source, String sequenceId) {
@@ -345,7 +600,7 @@ public final class CreateRailwayAnnouncerCommands {
 
         VoicePackManager.activePack().ifPresentOrElse(pack -> {
             source.sendSuccess(() -> Component.literal(
-                    "Loaded voice pack: " + pack.name() + " (" + pack.id() + "), phrases=" + VoicePackManager.phrases().size()
+                    "Loaded voice pack: " + pack.name() + " (" + pack.id() + "), phrases=" + VoicePackManager.phrases().size() + ", Sequences=" + VoicePackManager.sequences().size()
             ).withStyle(ChatFormatting.GREEN), false);
         }, () -> {
             source.sendFailure(Component.literal("No voice pack loaded. Check latest.log."));

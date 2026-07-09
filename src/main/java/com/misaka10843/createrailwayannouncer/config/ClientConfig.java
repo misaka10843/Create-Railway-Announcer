@@ -45,6 +45,16 @@ public final class ClientConfig {
             .comment("Platform announcement volume multiplier.")
             .defineInRange("audio.platformVolume", 1.0D, 0.0D, 2.0D);
 
+    public static final ModConfigSpec.DoubleValue MASTER_VOLUME = BUILDER
+            .comment("Master volume multiplier for Create Railway Announcer local playback.")
+            .defineInRange("audio.masterVolume", 1.0D, 0.0D, 1.0D);
+    public static final ModConfigSpec.DoubleValue MELODY_VOLUME = BUILDER
+            .comment("Volume multiplier for platform melody playback.")
+            .defineInRange("audio.melodyVolume", 0.8D, 0.0D, 1.0D);
+    public static final ModConfigSpec.DoubleValue CHIME_VOLUME = BUILDER
+            .comment("Volume multiplier for chime and short sound effects.")
+            .defineInRange("audio.chimeVolume", 0.9D, 0.0D, 1.0D);
+
     public static final ModConfigSpec.DoubleValue PLATFORM_VOLUME_WHEN_ON_TRAIN = BUILDER
             .comment("Platform voice volume multiplier when the listener is on the related train.")
             .defineInRange("audio.platformVolumeWhenOnTrain", 0.25D, 0.0D, 1.0D);

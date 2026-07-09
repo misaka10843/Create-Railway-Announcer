@@ -61,5 +61,63 @@
         "id": "common.transfer_suffix"
       }
     ]
+  },
+  "priority_low_test": {
+    "event": "priority_low_test",
+    "channel": "ONBOARD_VOICE",
+    "priority": 30,
+    "sequence": [
+      {
+        "type": "phrase",
+        "id": "common.next_is"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 300
+      },
+      {
+        "type": "station",
+        "id": "low_priority_station",
+        "variant": "desu",
+        "text": "低い優先度です"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 800
+      },
+      {
+        "type": "phrase",
+        "id": "common.door_left"
+      }
+    ]
+  },
+  "priority_high_test": {
+    "event": "priority_high_test",
+    "channel": "ONBOARD_VOICE",
+    "priority": 90,
+    "sequence": [
+      {
+        "type": "phrase",
+        "id": "platform.door_closing"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 500
+      },
+      {
+        "type": "station",
+        "id": "high_priority_station",
+        "variant": "desu",
+        "text": "高い優先度です"
+      },
+      {
+        "type": "pause",
+        "duration_ms": 800
+      },
+      {
+        "type": "phrase",
+        "id": "common.mind_belongings"
+      }
+    ]
   }
 }
