@@ -6,6 +6,7 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.stb.STBVorbis;
 import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.system.libc.LibCStdlib;
 
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
@@ -196,9 +197,19 @@ public final class LocalOggAudioPlayer {
 
             future.completeExceptionally(t);
         } finally {
-            if (pcm != null) {
-                MemoryUtil.memFree(pcm);
-            }
+            freeStbPcm(pcm);
+        }
+    }
+
+    private static void freeStbPcm(ShortBuffer pcm) {
+        if (pcm == null) {
+            return;
+        }
+
+        try {
+            LibCStdlib.nfree(MemoryUtil.memAddress(pcm));
+        } catch (Throwable t) {
+            CreateRailwayAnnouncer.LOGGER.warn("Failed to free STB decoded PCM buffer safely", t);
         }
     }
 
