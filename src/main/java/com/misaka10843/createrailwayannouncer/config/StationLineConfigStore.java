@@ -2,6 +2,7 @@ package com.misaka10843.createrailwayannouncer.config;
 
 import com.google.gson.*;
 import com.misaka10843.createrailwayannouncer.CreateRailwayAnnouncer;
+import net.minecraft.core.BlockPos;
 import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.IOException;
@@ -91,6 +92,97 @@ public final class StationLineConfigStore {
         return Collections.unmodifiableMap(new LinkedHashMap<>(LINES));
     }
 
+    public static synchronized boolean bindStationPosition(
+            String stationId,
+            String dimension,
+            BlockPos position
+    ) {
+        if (stationId == null || stationId.isBlank()) {
+            return false;
+        }
+
+        if (dimension == null || dimension.isBlank() || position == null) {
+            return false;
+        }
+
+        try {
+            Path file = root().resolve("stations.json");
+            ensureSampleStations(file);
+
+            JsonObject root = readObject(file);
+            JsonObject stationObject = findStationObject(root, stationId);
+
+            if (stationObject == null) {
+                return false;
+            }
+
+            JsonObject positionObject = new JsonObject();
+            positionObject.addProperty("dimension", dimension);
+            positionObject.addProperty("x", position.getX());
+            positionObject.addProperty("y", position.getY());
+            positionObject.addProperty("z", position.getZ());
+
+            stationObject.add("position", positionObject);
+
+            writeJson(file, root);
+            reload();
+
+            return true;
+        } catch (Exception e) {
+            CreateRailwayAnnouncer.LOGGER.error("Failed to bind station position: {}", stationId, e);
+            return false;
+        }
+    }
+
+    public static synchronized boolean unbindStationPosition(String stationId) {
+        if (stationId == null || stationId.isBlank()) {
+            return false;
+        }
+
+        try {
+            Path file = root().resolve("stations.json");
+            ensureSampleStations(file);
+
+            JsonObject root = readObject(file);
+            JsonObject stationObject = findStationObject(root, stationId);
+
+            if (stationObject == null) {
+                return false;
+            }
+
+            stationObject.remove("position");
+
+            writeJson(file, root);
+            reload();
+
+            return true;
+        } catch (Exception e) {
+            CreateRailwayAnnouncer.LOGGER.error("Failed to unbind station position: {}", stationId, e);
+            return false;
+        }
+    }
+
+    private static JsonObject findStationObject(JsonObject root, String stationId) {
+        if (root.has(stationId) && root.get(stationId).isJsonObject()) {
+            return root.getAsJsonObject(stationId);
+        }
+
+        for (Map.Entry<String, JsonElement> entry : root.entrySet()) {
+            if (!entry.getValue().isJsonObject()) {
+                continue;
+            }
+
+            JsonObject object = entry.getValue().getAsJsonObject();
+            String customId = readString(object, "custom_id", entry.getKey());
+
+            if (stationId.equals(customId)) {
+                return object;
+            }
+        }
+
+        return null;
+    }
+
     public static Path root() {
         return FMLPaths.CONFIGDIR.get()
                 .resolve(CreateRailwayAnnouncer.MODID)
@@ -156,6 +248,19 @@ public final class StationLineConfigStore {
         config.setPlatform(readString(object, "platform", "1"));
         config.setHorizontalRange(readInt(object, "horizontal_range", ServerConfig.DEFAULT_STATION_HORIZONTAL_RANGE.get()));
         config.setVerticalRange(readInt(object, "vertical_range", ServerConfig.DEFAULT_STATION_VERTICAL_RANGE.get()));
+        if (object.has("position") && object.get("position").isJsonObject()) {
+            JsonObject positionObject = object.getAsJsonObject("position");
+
+            String dimension = readString(positionObject, "dimension", "");
+            int x = readInt(positionObject, "x", 0);
+            int y = readInt(positionObject, "y", 0);
+            int z = readInt(positionObject, "z", 0);
+
+            if (!dimension.isBlank()) {
+                config.setDimension(dimension);
+                config.setPosition(new BlockPos(x, y, z));
+            }
+        }
 
         if (object.has("transfer_line_ids") && object.get("transfer_line_ids").isJsonArray()) {
             for (JsonElement element : object.getAsJsonArray("transfer_line_ids")) {

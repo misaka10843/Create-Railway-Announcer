@@ -23,7 +23,7 @@ public record AnnouncementPlaybackRequest(
     public static AnnouncementPlaybackRequest fromPacket(AnnouncementPacket packet) {
         return new AnnouncementPlaybackRequest(
                 packet.eventType(),
-                sequenceIdFor(packet.eventType()),
+                packet.sequenceId(),
                 stationIdFor(packet),
                 uuidToString(packet.trainId())
         );

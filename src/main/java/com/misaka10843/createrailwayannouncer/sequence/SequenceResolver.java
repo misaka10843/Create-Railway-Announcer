@@ -9,6 +9,7 @@ import com.misaka10843.createrailwayannouncer.config.*;
 import com.misaka10843.createrailwayannouncer.pack.PhraseEntry;
 import com.misaka10843.createrailwayannouncer.pack.VoicePackManager;
 import com.misaka10843.createrailwayannouncer.tts.TtsBackend;
+import com.misaka10843.createrailwayannouncer.audio.OggDurationReader;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -173,13 +174,23 @@ public final class SequenceResolver {
                         resolvedItems.addAll(future.join());
                     }
 
-                    return new ResolvedSequence(
+                    ResolvedSequence sequence = new ResolvedSequence(
                             template.id(),
                             template.event(),
                             template.channel(),
                             template.priority(),
                             resolvedItems
                     );
+
+                    com.misaka10843.createrailwayannouncer.CreateRailwayAnnouncer.LOGGER.info(
+                            "Resolved sequence duration: id={}, items={}, playableItems={}, totalDurationMs={}",
+                            sequence.id(),
+                            sequence.items().size(),
+                            sequence.playableItemCount(),
+                            sequence.totalDurationMs()
+                    );
+
+                    return sequence;
                 });
     }
 
@@ -374,7 +385,10 @@ public final class SequenceResolver {
             return List.of();
         }
 
-        return List.of(ResolvedSequenceItem.sound(soundPath));
+        return List.of(ResolvedSequenceItem.sound(
+                soundPath,
+                OggDurationReader.durationMs(soundPath)
+        ));
     }
 
     private List<ResolvedSequenceItem> toAudioItem(AudioFragmentResult result) {
@@ -391,7 +405,10 @@ public final class SequenceResolver {
             return List.of();
         }
 
-        return List.of(ResolvedSequenceItem.audio(result.audioPath()));
+        return List.of(ResolvedSequenceItem.audio(
+                result.audioPath(),
+                result.durationMs()
+        ));
     }
 
     private void resolvePhrase(JsonObject raw, List<CompletableFuture<AudioFragmentResult>> futures) {

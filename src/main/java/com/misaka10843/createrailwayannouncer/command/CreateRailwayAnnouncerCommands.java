@@ -1,14 +1,17 @@
 package com.misaka10843.createrailwayannouncer.command;
 
 import com.misaka10843.createrailwayannouncer.CreateRailwayAnnouncer;
-import com.misaka10843.createrailwayannouncer.announcement.AnnouncementEventType;
-import com.misaka10843.createrailwayannouncer.announcement.ServerAnnouncementCooldown;
-import com.misaka10843.createrailwayannouncer.announcement.ServerAnnouncementDispatcher;
-import com.misaka10843.createrailwayannouncer.announcement.ServerAnnouncementRequest;
+import com.misaka10843.createrailwayannouncer.announcement.*;
+import com.misaka10843.createrailwayannouncer.announcement.source.AnnouncementSource;
+import com.misaka10843.createrailwayannouncer.announcement.source.ServerAnnouncementSourceRegistry;
 import com.misaka10843.createrailwayannouncer.audio.*;
 import com.misaka10843.createrailwayannouncer.client.runtime.AnnouncementPlaybackRequest;
 import com.misaka10843.createrailwayannouncer.client.runtime.ClientAnnouncementRuntime;
 import com.misaka10843.createrailwayannouncer.client.runtime.ClientAnnouncementServices;
+import com.misaka10843.createrailwayannouncer.compat.create.CreateApiProbe;
+import com.misaka10843.createrailwayannouncer.compat.create.CreateStationSnapshot;
+import com.misaka10843.createrailwayannouncer.compat.create.CreateTrainAdapter;
+import com.misaka10843.createrailwayannouncer.compat.create.CreateTrainAdapterHolder;
 import com.misaka10843.createrailwayannouncer.config.ClientConfig;
 import com.misaka10843.createrailwayannouncer.config.LineConfig;
 import com.misaka10843.createrailwayannouncer.config.StationConfig;
@@ -214,6 +217,27 @@ public final class CreateRailwayAnnouncerCommands {
                                                         context.getSource(),
                                                         StringArgumentType.getString(context, "id")
                                                 ))))
+                                .then(Commands.literal("send_station_next_stop")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> sendStationAnnouncementPacket(
+                                                        context.getSource(),
+                                                        AnnouncementEventType.ONBOARD_NEXT_STOP,
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("send_station_onboard_door_closing")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> sendStationAnnouncementPacket(
+                                                        context.getSource(),
+                                                        AnnouncementEventType.DOOR_CLOSING,
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("send_station_door_closing")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> sendStationAnnouncementPacket(
+                                                        context.getSource(),
+                                                        AnnouncementEventType.PLATFORM_DOOR_CLOSING,
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
                                 .then(Commands.literal("stop")
                                         .executes(context -> stopPlayback(context.getSource())))
                                 .then(Commands.literal("status")
@@ -227,6 +251,10 @@ public final class CreateRailwayAnnouncerCommands {
                                                 context.getSource(),
                                                 AnnouncementEventType.ONBOARD_NEXT_STOP
                                         )))
+                                .then(Commands.literal("active_info")
+                                        .executes(context -> activeAnnouncementInfo(context.getSource())))
+                                .then(Commands.literal("active_clear")
+                                        .executes(context -> clearActiveAnnouncements(context.getSource())))
                         )
                         .then(Commands.literal("data")
                                 .then(Commands.literal("reload")
@@ -246,8 +274,546 @@ public final class CreateRailwayAnnouncerCommands {
                                                         StringArgumentType.getString(context, "id")
                                                 ))))
                         )
+                        .then(Commands.literal("station")
+                                .then(Commands.literal("bind")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> bindStation(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("unbind")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> unbindStation(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("info")
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .executes(context -> stationInfo(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "id")
+                                                ))))
+                                .then(Commands.literal("list")
+                                        .executes(context -> stationList(context.getSource())))
+                        )
+                        .then(Commands.literal("create")
+                                .then(Commands.literal("probe")
+                                        .executes(context -> {
+                                            CreateApiProbe.probe();
+
+                                            context.getSource()
+                                                    .sendSuccess(
+                                                            () -> Component.literal(
+                                                                    "Create API probe executed."
+                                                            ),
+                                                            false
+                                                    );
+
+                                            return 1;
+                                        }))
+                                .then(Commands.literal("train_status")
+                                        .executes(context ->
+                                                createTrainStatus(
+                                                        context.getSource()
+                                                )))
+                                .then(Commands.literal("schedule_status")
+                                        .executes(context ->
+                                                scheduleStatus(
+                                                        context.getSource()
+                                                )))
+                        )
+                        .then(Commands.literal("source")
+                                .then(Commands.literal("add")
+                                        .then(Commands.literal("station")
+                                                .then(Commands.argument("id", StringArgumentType.word())
+                                                        .executes(context ->
+                                                                addStationSource(
+                                                                        context.getSource(),
+                                                                        StringArgumentType.getString(context, "id")
+                                                                ))))
+                                        .then(Commands.literal("onboard")
+                                                .executes(context ->
+                                                        addOnboardSource(
+                                                                context.getSource()
+                                                        ))))
+                                .then(Commands.literal("list")
+                                        .executes(context ->
+                                                listSources(
+                                                        context.getSource()
+                                                )))
+                                .then(Commands.literal("clear")
+                                        .executes(context ->
+                                                clearSources(
+                                                        context.getSource()
+                                                )))
+                        )
 
         );
+    }
+
+    private static int listSources(
+            CommandSourceStack source
+    ) {
+
+        StringBuilder builder =
+                new StringBuilder();
+
+
+        builder.append(
+                "Sources="
+        );
+
+
+        for (AnnouncementSource s :
+                ServerAnnouncementSourceRegistry.sources()) {
+
+            builder.append("\n")
+                    .append(s.type())
+                    .append(" ")
+                    .append(s.sourceId())
+                    .append(" pos=")
+                    .append(s.position());
+        }
+
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        builder.toString()
+                ),
+                false
+        );
+
+
+        return 1;
+    }
+
+    private static int addStationSource(
+            CommandSourceStack source,
+            String stationId
+    ) throws CommandSyntaxException {
+
+        ServerPlayer player =
+                source.getPlayerOrException();
+
+        AnnouncementSource result =
+                ServerAnnouncementSourceRegistry.addStationSource(
+                        source.getLevel(),
+                        stationId,
+                        player.blockPosition(),
+                        32,
+                        16,
+                        AudioChannel.PLATFORM_VOICE
+                );
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Added station source: "
+                                + result.sourceId()
+                                + " station="
+                                + stationId
+                                + " pos="
+                                + result.position()
+                ),
+                false
+        );
+
+        return 1;
+    }
+
+    private static int addOnboardSource(
+            CommandSourceStack source
+    ) throws CommandSyntaxException {
+
+        ServerPlayer player =
+                source.getPlayerOrException();
+
+
+        CreateTrainAdapter adapter =
+                CreateTrainAdapterHolder.get();
+
+
+        var train =
+                adapter.findTrainContainingServerPlayer(player)
+                        .orElse(null);
+
+
+        if (train == null) {
+
+            source.sendFailure(
+                    Component.literal(
+                            "No Create train found"
+                    )
+            );
+
+            return 0;
+        }
+
+
+        AnnouncementSource result =
+                ServerAnnouncementSourceRegistry.addOnboardSource(
+                        source.getLevel(),
+                        train.trainId(),
+                        player.blockPosition(),
+                        32,
+                        16
+                );
+
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Added onboard source: "
+                                + result.sourceId()
+                                + " train="
+                                + train.trainId()
+                ),
+                false
+        );
+
+        return 1;
+    }
+
+    private static int clearSources(
+            CommandSourceStack source
+    ) {
+
+        int count =
+                ServerAnnouncementSourceRegistry.clear();
+
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Cleared sources="
+                                + count
+                ),
+                false
+        );
+
+
+        return 1;
+    }
+
+    private static int scheduleStatus(
+            CommandSourceStack source
+    ) throws CommandSyntaxException {
+        ServerPlayer player =
+                source.getPlayerOrException();
+
+        CreateTrainAdapter adapter =
+                CreateTrainAdapterHolder.get();
+
+        adapter.findTrainContainingServerPlayer(player)
+                .ifPresentOrElse(
+                        train ->
+                                source.sendSuccess(
+                                        () -> Component.literal(
+                                                "Schedule next="
+                                                        + stationName(train.nextStation())
+                                                        + " destination="
+                                                        + stationName(train.destinationStation())
+                                        ),
+                                        false
+                                ),
+                        () ->
+                                source.sendSuccess(
+                                        () -> Component.literal(
+                                                "No train"
+                                        ),
+                                        false
+                                )
+                );
+        return 1;
+    }
+
+    private static String stationName(
+            CreateStationSnapshot station
+    ) {
+        if (station == null) {
+            return "null";
+        }
+
+        return station.name();
+    }
+
+    private static int createTrainStatus(
+            CommandSourceStack source
+    ) throws CommandSyntaxException {
+
+        ServerPlayer player =
+                source.getPlayerOrException();
+
+
+        CreateTrainAdapter adapter =
+                CreateTrainAdapterHolder.get();
+
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Create adapter="
+                                + adapter.getClass().getSimpleName()
+                                + ", available="
+                                + adapter.isAvailable()
+                ),
+                false
+        );
+
+
+        adapter.findTrainContainingServerPlayer(player)
+                .ifPresentOrElse(
+                        train -> source.sendSuccess(
+                                () -> Component.literal(
+                                        "Train found: "
+                                                + train.trainName()
+                                                + "\nSpeed="
+                                                + train.speed()
+                                                + "\nCurrent="
+                                                + stationName(train.currentStation())
+                                                + "\nNext="
+                                                + stationName(train.nextStation())
+                                                + "\nDestination="
+                                                + stationName(train.destinationStation())
+                                ),
+                                false
+                        ),
+
+                        () -> source.sendSuccess(
+                                () -> Component.literal(
+                                        "No Create train found."
+                                ),
+                                false
+                        )
+                );
+
+
+        return 1;
+    }
+
+    private static int probeCreate(CommandSourceStack source) {
+
+        CreateApiProbe.probe();
+
+        source.sendSuccess(() ->
+                        Component.literal(
+                                "Create API probe executed. Check latest.log."
+                        ),
+                false
+        );
+
+        return 1;
+    }
+
+    private static int activeAnnouncementInfo(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal(
+                "Active announcement sessions=" + ServerActiveAnnouncementRegistry.size()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int clearActiveAnnouncements(CommandSourceStack source) {
+        int cleared = ServerActiveAnnouncementRegistry.clear();
+
+        source.sendSuccess(() -> Component.literal(
+                "Active announcement sessions cleared. entries=" + cleared
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int bindStation(CommandSourceStack source, String stationId) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+
+        StationConfig station = StationLineConfigStore.station(stationId).orElse(null);
+        if (station == null) {
+            source.sendFailure(Component.literal("Station not found: " + stationId));
+            return 0;
+        }
+
+        String dimension = source.getLevel().dimension().location().toString();
+        BlockPos position = player.blockPosition();
+
+        boolean success = StationLineConfigStore.bindStationPosition(
+                stationId,
+                dimension,
+                position
+        );
+
+        if (!success) {
+            source.sendFailure(Component.literal("Failed to bind station position: " + stationId));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Station bound: "
+                        + stationId
+                        + " -> "
+                        + dimension
+                        + " "
+                        + position
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int unbindStation(CommandSourceStack source, String stationId) {
+        boolean success = StationLineConfigStore.unbindStationPosition(stationId);
+
+        if (!success) {
+            source.sendFailure(Component.literal("Failed to unbind station position: " + stationId));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Station position removed: " + stationId
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int stationInfo(CommandSourceStack source, String stationId) {
+        StationConfig station = StationLineConfigStore.station(stationId).orElse(null);
+
+        if (station == null) {
+            source.sendFailure(Component.literal("Station not found: " + stationId));
+            return 0;
+        }
+
+        String positionText = station.hasPosition()
+                ? station.getDimension() + " " + station.getPosition()
+                : "not bound";
+
+        source.sendSuccess(() -> Component.literal(
+                "Station: "
+                        + station.getCustomId()
+                        + ", display.ja_jp="
+                        + station.getDisplay().getOrDefault("ja_jp", "")
+                        + ", reading.ja_jp="
+                        + station.getReading().getOrDefault("ja_jp", "")
+                        + ", platform="
+                        + station.getPlatform()
+                        + ", doorSide="
+                        + station.getDoorSide()
+                        + ", range="
+                        + station.getHorizontalRange()
+                        + "x"
+                        + station.getVerticalRange()
+                        + ", position="
+                        + positionText
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int stationList(CommandSourceStack source) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Stations: ");
+
+        int count = 0;
+        for (StationConfig station : StationLineConfigStore.stations().values()) {
+            if (count > 0) {
+                builder.append(", ");
+            }
+
+            builder.append(station.getCustomId());
+
+            if (station.hasPosition()) {
+                builder.append("[bound]");
+            } else {
+                builder.append("[unbound]");
+            }
+
+            count++;
+        }
+
+        if (count == 0) {
+            builder.append("none");
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                builder.toString()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
+    }
+
+    private static int sendStationAnnouncementPacket(
+            CommandSourceStack source,
+            AnnouncementEventType eventType,
+            String stationId
+    ) throws CommandSyntaxException {
+        source.getPlayerOrException();
+
+        StationConfig station = StationLineConfigStore.station(stationId).orElse(null);
+        if (station == null) {
+            source.sendFailure(Component.literal("Station not found: " + stationId));
+            return 0;
+        }
+
+        if (!station.hasPosition()) {
+            source.sendFailure(Component.literal(
+                    "Station is not bound to a position: "
+                            + stationId
+                            + ". Use /cra station bind "
+                            + stationId
+            ));
+            return 0;
+        }
+
+        ServerLevel level = source.getLevel();
+
+        int priority = priorityFor(eventType);
+        AudioChannel channel = channelFor(eventType);
+
+        ServerAnnouncementRequest request = ServerAnnouncementRequest.of(
+                eventType,
+                DEBUG_TRAIN_ID,
+                "debug_train",
+                DEBUG_STATION_ID,
+                null,
+                "debug_current_station",
+                stationId,
+                "debug_destination_station",
+                channel,
+                priority
+        );
+
+        ServerAnnouncementDispatcher.DispatchResult result =
+                ServerAnnouncementDispatcher.dispatchToNearbyPlayers(level, request);
+
+        if (!result.accepted()) {
+            if (result.suppressed()) {
+                source.sendSuccess(() -> Component.literal(
+                        "Station announcement suppressed by cooldown: station="
+                                + stationId
+                                + ", event="
+                                + eventType
+                                + ", remainingTicks="
+                                + result.remainingCooldownTicks()
+                ).withStyle(ChatFormatting.YELLOW), false);
+                return 1;
+            }
+
+            source.sendFailure(Component.literal(
+                    "Station announcement rejected: " + result.message()
+            ));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal(
+                "Dispatched station announcement: station="
+                        + stationId
+                        + ", event="
+                        + eventType
+                        + ", center="
+                        + station.getPosition()
+                        + ", range="
+                        + result.horizontalRange()
+                        + "x"
+                        + result.verticalRange()
+                        + ", players="
+                        + result.sentPlayers()
+        ).withStyle(ChatFormatting.GREEN), false);
+
+        return 1;
     }
 
     private static int clearAnnouncementCooldown(CommandSourceStack source) {
@@ -580,9 +1146,10 @@ public final class CreateRailwayAnnouncerCommands {
             PlaybackSession session = result.session();
 
             String action = switch (result.decision()) {
-                case STARTED -> "started";
-                case REPLACED -> "replaced previous session";
-                case REJECTED_LOWER_PRIORITY -> "rejected";
+                case STARTED -> "Started";
+                case REPLACED -> "Replaced";
+                case REJECTED_LOWER_PRIORITY -> "Rejected";
+                case SKIPPED_EXPIRED -> "Skipped expired";
             };
 
             source.sendSuccess(() -> Component.literal(

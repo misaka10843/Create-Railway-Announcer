@@ -33,11 +33,13 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
         firstPlayableItem.set(true);
 
         CreateRailwayAnnouncer.LOGGER.info(
-                "Local OGG playback started: {}, channel={}, priority={}, items={}",
+                "Local OGG playback started: {}, channel={}, priority={}, items={}, playableItems={}, totalDurationMs={}",
                 sequence.id(),
                 sequence.channel(),
                 sequence.priority(),
-                sequence.items().size()
+                sequence.items().size(),
+                sequence.playableItemCount(),
+                sequence.totalDurationMs()
         );
     }
 
@@ -52,7 +54,13 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
 
     @Override
     public CompletableFuture<Void> playAudio(ResolvedSequence sequence, ResolvedSequenceItem item) {
-        CreateRailwayAnnouncer.LOGGER.info("[{}] PLAY AUDIO {}", sequence.id(), item.audioPath());
+        CreateRailwayAnnouncer.LOGGER.info(
+                "[{}] PLAY AUDIO {} durationMs={} startOffsetMs={}",
+                sequence.id(),
+                item.audioPath(),
+                item.durationMs(),
+                item.startOffsetMs()
+        );
 
         int fadeInMs = firstPlayableItem.getAndSet(false)
                 ? SESSION_FADE_IN_MS
@@ -60,7 +68,7 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
 
         float gain = gainFor(sequence);
 
-        return player.play(item.audioPath(), gain, fadeInMs).whenComplete((ignored, throwable) -> {
+        return player.play(item.audioPath(), gain, fadeInMs, item.startOffsetMs()).whenComplete((ignored, throwable) -> {
             if (throwable != null) {
                 CreateRailwayAnnouncer.LOGGER.error(
                         "Local OGG audio playback failed: {}",
@@ -73,7 +81,13 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
 
     @Override
     public CompletableFuture<Void> playSound(ResolvedSequence sequence, ResolvedSequenceItem item) {
-        CreateRailwayAnnouncer.LOGGER.info("[{}] PLAY SOUND {}", sequence.id(), item.audioPath());
+        CreateRailwayAnnouncer.LOGGER.info(
+                "[{}] PLAY SOUND {} durationMs={} startOffsetMs={}",
+                sequence.id(),
+                item.audioPath(),
+                item.durationMs(),
+                item.startOffsetMs()
+        );
 
         int fadeInMs = firstPlayableItem.getAndSet(false)
                 ? SESSION_FADE_IN_MS
@@ -81,7 +95,7 @@ public final class LocalOggSequenceAudioBackend implements SequenceAudioBackend 
 
         float gain = gainFor(sequence);
 
-        return player.play(item.audioPath(), gain, fadeInMs).whenComplete((ignored, throwable) -> {
+        return player.play(item.audioPath(), gain, fadeInMs, item.startOffsetMs()).whenComplete((ignored, throwable) -> {
             if (throwable != null) {
                 CreateRailwayAnnouncer.LOGGER.error(
                         "Local OGG sound playback failed: {}",

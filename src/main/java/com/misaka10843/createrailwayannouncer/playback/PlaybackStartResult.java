@@ -33,7 +33,17 @@ public record PlaybackStartResult(
         );
     }
 
+    public static PlaybackStartResult skippedExpired() {
+        return new PlaybackStartResult(
+                PlaybackStartDecision.SKIPPED_EXPIRED,
+                null,
+                null,
+                "Playback request skipped because catch-up offset exceeded sequence duration."
+        );
+    }
+
     public boolean accepted() {
-        return decision != PlaybackStartDecision.REJECTED_LOWER_PRIORITY;
+        return decision == PlaybackStartDecision.STARTED
+                || decision == PlaybackStartDecision.REPLACED;
     }
 }

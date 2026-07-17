@@ -81,7 +81,14 @@ public final class PlaybackScheduler {
                     case AUDIO -> backend.playAudio(sequence, item).join();
                     case SOUND -> backend.playSound(sequence, item).join();
                     case SUBTITLE -> backend.showSubtitle(sequence, item);
-                    case PAUSE -> pause(item.pauseMs());
+                    case PAUSE -> {
+                        CreateRailwayAnnouncer.LOGGER.info(
+                                "[{}] PAUSE {} ms",
+                                sequence.id(),
+                                item.pauseMs()
+                        );
+                        pause(item.pauseMs());
+                    }
                 }
             }
 

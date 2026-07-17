@@ -1,5 +1,7 @@
 package com.misaka10843.createrailwayannouncer.config;
 
+import net.minecraft.core.BlockPos;
+
 import java.util.*;
 
 public class StationConfig {
@@ -10,9 +12,13 @@ public class StationConfig {
     private String customId = "";
     private boolean enabled = true;
     private DoorSide doorSide = DoorSide.NONE;
-    private String platform = "1";
+    private final Map<String, PlatformConfig> platforms =
+            new HashMap<>();
+    private String platform = "";
     private int horizontalRange = ServerConfig.DEFAULT_STATION_HORIZONTAL_RANGE.get();
     private int verticalRange = ServerConfig.DEFAULT_STATION_VERTICAL_RANGE.get();
+    private String dimension = "";
+    private BlockPos position;
 
     public UUID getCreateStationId() {
         return createStationId;
@@ -54,6 +60,10 @@ public class StationConfig {
         this.doorSide = doorSide == null ? DoorSide.NONE : doorSide;
     }
 
+    public Map<String, PlatformConfig> getPlatforms() {
+        return platforms;
+    }
+
     public String getPlatform() {
         return platform;
     }
@@ -80,5 +90,25 @@ public class StationConfig {
 
     public List<String> getTransferLineIds() {
         return transferLineIds;
+    }
+
+    public String getDimension() {
+        return dimension;
+    }
+
+    public void setDimension(String dimension) {
+        this.dimension = dimension == null ? "" : dimension;
+    }
+
+    public BlockPos getPosition() {
+        return position;
+    }
+
+    public void setPosition(BlockPos position) {
+        this.position = position;
+    }
+
+    public boolean hasPosition() {
+        return position != null && dimension != null && !dimension.isBlank();
     }
 }

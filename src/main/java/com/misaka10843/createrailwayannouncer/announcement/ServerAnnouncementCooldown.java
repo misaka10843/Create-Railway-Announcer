@@ -83,16 +83,46 @@ public final class ServerAnnouncementCooldown {
     }
 
     private static String primaryStationConfigId(ServerAnnouncementRequest request) {
-        if (notBlank(request.nextStationConfigId())) {
-            return request.nextStationConfigId();
+        return switch (request.eventType()) {
+            case ONBOARD_ARRIVED,
+                 PLATFORM_ARRIVAL,
+                 DOOR_OPENING -> firstNonBlank(
+                    request.currentStationConfigId(),
+                    request.nextStationConfigId(),
+                    request.destinationStationConfigId()
+            );
+
+            case ONBOARD_NEXT_STOP,
+                 ONBOARD_APPROACHING,
+                 PLATFORM_APPROACH -> firstNonBlank(
+                    request.nextStationConfigId(),
+                    request.currentStationConfigId(),
+                    request.destinationStationConfigId()
+            );
+
+            default -> firstNonBlank(
+                    request.currentStationConfigId(),
+                    request.nextStationConfigId(),
+                    request.destinationStationConfigId()
+            );
+        };
+    }
+
+    private static String firstNonBlank(
+            String first,
+            String second,
+            String third
+    ) {
+        if (notBlank(first)) {
+            return first;
         }
 
-        if (notBlank(request.currentStationConfigId())) {
-            return request.currentStationConfigId();
+        if (notBlank(second)) {
+            return second;
         }
 
-        if (notBlank(request.destinationStationConfigId())) {
-            return request.destinationStationConfigId();
+        if (notBlank(third)) {
+            return third;
         }
 
         return "";

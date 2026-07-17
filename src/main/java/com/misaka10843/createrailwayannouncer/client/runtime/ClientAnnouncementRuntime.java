@@ -7,6 +7,7 @@ import com.misaka10843.createrailwayannouncer.playback.PlaybackSession;
 import com.misaka10843.createrailwayannouncer.playback.PlaybackStartResult;
 import com.misaka10843.createrailwayannouncer.playback.SequenceAudioBackend;
 import com.misaka10843.createrailwayannouncer.sequence.AnnouncementResolveContext;
+import com.misaka10843.createrailwayannouncer.sequence.ResolvedSequence;
 import com.misaka10843.createrailwayannouncer.sequence.SequenceResolver;
 import com.misaka10843.createrailwayannouncer.sequence.SequenceTemplate;
 
@@ -31,6 +32,13 @@ public final class ClientAnnouncementRuntime {
     }
 
     public CompletableFuture<PlaybackStartResult> play(AnnouncementPlaybackRequest request) {
+        return play(request, 0L);
+    }
+
+    public CompletableFuture<PlaybackStartResult> play(
+            AnnouncementPlaybackRequest request,
+            long offsetMs
+    ) {
         if (request == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("request is null"));
         }
@@ -45,12 +53,15 @@ public final class ClientAnnouncementRuntime {
             ));
         }
 
+        long safeOffsetMs = Math.max(0L, offsetMs);
+
         CreateRailwayAnnouncer.LOGGER.info(
-                "Client announcement runtime resolving request: event={}, sequence={}, station={}, train={}",
+                "Client announcement runtime resolving request: event={}, sequence={}, station={}, train={}, offsetMs={}",
                 request.eventType(),
                 request.sequenceId(),
                 request.stationId(),
-                request.trainId()
+                request.trainId(),
+                safeOffsetMs
         );
 
         AnnouncementResolveContext resolveContext =
@@ -58,21 +69,41 @@ public final class ClientAnnouncementRuntime {
 
         return sequenceResolver.resolveSequence(template, resolveContext)
                 .thenApply(sequence -> {
-                    PlaybackStartResult result = PLAYBACK_MANAGER.play(sequence, backend);
+                    ResolvedSequence playbackSequence = sequence;
+
+                    if (safeOffsetMs > 0L) {
+                        playbackSequence = sequence.skipTo(safeOffsetMs);
+                    }
+
+                    if (playbackSequence.isEmpty()) {
+                        CreateRailwayAnnouncer.LOGGER.info(
+                                "Client announcement playback skipped: sequence={}, offsetMs={}, originalTotalDurationMs={}",
+                                sequence.id(),
+                                safeOffsetMs,
+                                sequence.totalDurationMs()
+                        );
+
+                        return PlaybackStartResult.skippedExpired();
+                    }
+
+                    PlaybackStartResult result = PLAYBACK_MANAGER.play(playbackSequence, backend);
 
                     if (result.accepted()) {
                         PlaybackSession session = result.session();
                         CreateRailwayAnnouncer.LOGGER.info(
-                                "Client announcement playback accepted: sequence={}, channel={}, priority={}, decision={}",
+                                "Client announcement playback accepted: sequence={}, channel={}, priority={}, decision={}, offsetMs={}, totalDurationMs={}",
                                 session.sequence().id(),
                                 session.channel(),
                                 session.sequence().priority(),
-                                result.decision()
+                                result.decision(),
+                                safeOffsetMs,
+                                session.sequence().totalDurationMs()
                         );
                     } else {
                         CreateRailwayAnnouncer.LOGGER.info(
-                                "Client announcement playback rejected: sequence={}, reason={}",
+                                "Client announcement playback rejected/skipped: sequence={}, decision={}, reason={}",
                                 request.sequenceId(),
+                                result.decision(),
                                 result.message()
                         );
                     }

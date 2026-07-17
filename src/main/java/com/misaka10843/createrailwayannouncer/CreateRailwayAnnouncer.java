@@ -1,5 +1,7 @@
 package com.misaka10843.createrailwayannouncer;
 
+import com.misaka10843.createrailwayannouncer.announcement.ServerActiveAnnouncementRegistry;
+import com.misaka10843.createrailwayannouncer.announcement.TrainAnnouncementController;
 import com.misaka10843.createrailwayannouncer.command.CreateRailwayAnnouncerCommands;
 import com.misaka10843.createrailwayannouncer.config.ClientConfig;
 import com.misaka10843.createrailwayannouncer.config.ServerConfig;
@@ -14,6 +16,7 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
 @Mod(CreateRailwayAnnouncer.MODID)
@@ -36,6 +39,13 @@ public class CreateRailwayAnnouncer {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         CreateRailwayAnnouncerCommands.register(event.getDispatcher());
     }
+
+    @SubscribeEvent
+    public void onServerTick(ServerTickEvent.Post event) {
+        ServerActiveAnnouncementRegistry.serverTick(event.getServer());
+        TrainAnnouncementController.tick(event.getServer());
+    }
+
 
     private void commonSetup(FMLCommonSetupEvent event) {
         LOGGER.info("{} common setup complete", NAME);

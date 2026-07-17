@@ -14,6 +14,7 @@ import java.util.UUID;
 public record AnnouncementPacket(
         UUID announcementId,
         AnnouncementEventType eventType,
+        String sequenceId,
         UUID trainId,
         String trainName,
         UUID stationId,
@@ -25,7 +26,9 @@ public record AnnouncementPacket(
         int verticalRange,
         AudioChannel channel,
         int priority,
-        long serverGameTime
+        long announcementStartGameTime,
+        long packetSendGameTime,
+        boolean catchUp
 ) implements CustomPacketPayload {
     public static final Type<AnnouncementPacket> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(CreateRailwayAnnouncer.MODID, "announcement")
@@ -47,6 +50,7 @@ public record AnnouncementPacket(
     private static AnnouncementPacket read(RegistryFriendlyByteBuf buffer) {
         UUID announcementId = buffer.readUUID();
         AnnouncementEventType eventType = buffer.readEnum(AnnouncementEventType.class);
+        String sequenceId = buffer.readUtf();
         UUID trainId = buffer.readUUID();
         String trainName = buffer.readUtf();
         UUID stationId = buffer.readUUID();
@@ -58,11 +62,14 @@ public record AnnouncementPacket(
         int verticalRange = buffer.readVarInt();
         AudioChannel channel = buffer.readEnum(AudioChannel.class);
         int priority = buffer.readVarInt();
-        long serverGameTime = buffer.readLong();
+        long announcementStartGameTime = buffer.readLong();
+        long packetSendGameTime = buffer.readLong();
+        boolean catchUp = buffer.readBoolean();
 
         return new AnnouncementPacket(
                 announcementId,
                 eventType,
+                sequenceId,
                 trainId,
                 trainName,
                 stationId,
@@ -74,13 +81,16 @@ public record AnnouncementPacket(
                 verticalRange,
                 channel,
                 priority,
-                serverGameTime
+                announcementStartGameTime,
+                packetSendGameTime,
+                catchUp
         );
     }
 
     private static void write(RegistryFriendlyByteBuf buffer, AnnouncementPacket packet) {
         buffer.writeUUID(packet.announcementId());
         buffer.writeEnum(packet.eventType());
+        buffer.writeUtf(nullToEmpty(packet.sequenceId()));
         buffer.writeUUID(packet.trainId());
         buffer.writeUtf(nullToEmpty(packet.trainName()));
         buffer.writeUUID(packet.stationId());
@@ -92,7 +102,9 @@ public record AnnouncementPacket(
         buffer.writeVarInt(packet.verticalRange());
         buffer.writeEnum(packet.channel());
         buffer.writeVarInt(packet.priority());
-        buffer.writeLong(packet.serverGameTime());
+        buffer.writeLong(packet.announcementStartGameTime());
+        buffer.writeLong(packet.packetSendGameTime());
+        buffer.writeBoolean(packet.catchUp());
     }
 
     private static String nullToEmpty(String value) {

@@ -25,6 +25,7 @@ public final class LocalOggAudioPlayer {
     });
 
     private final Set<ActiveSound> activeSounds = ConcurrentHashMap.newKeySet();
+    private static final int AL_SEC_OFFSET = 0x1024;
 
     private static void freeStbPcm(ShortBuffer pcm) {
         if (pcm == null) {
@@ -69,6 +70,15 @@ public final class LocalOggAudioPlayer {
     }
 
     public CompletableFuture<Void> play(Path oggPath, float targetGain, int fadeInMs) {
+        return play(oggPath, targetGain, fadeInMs, 0L);
+    }
+
+    public CompletableFuture<Void> play(
+            Path oggPath,
+            float targetGain,
+            int fadeInMs,
+            long startOffsetMs
+    ) {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         if (oggPath == null) {
@@ -88,7 +98,14 @@ public final class LocalOggAudioPlayer {
         }
 
         Minecraft minecraft = Minecraft.getInstance();
-        minecraft.execute(() -> startOnRenderThread(minecraft, oggPath, targetGain, fadeInMs, future));
+        minecraft.execute(() -> startOnRenderThread(
+                minecraft,
+                oggPath,
+                targetGain,
+                fadeInMs,
+                Math.max(0L, startOffsetMs),
+                future
+        ));
 
         return future;
     }
@@ -146,6 +163,7 @@ public final class LocalOggAudioPlayer {
             Path oggPath,
             float targetGain,
             int fadeInMs,
+            long startOffsetMs,
             CompletableFuture<Void> future
     ) {
         int buffer = 0;
@@ -194,6 +212,21 @@ public final class LocalOggAudioPlayer {
 
             AL10.alSourcei(source, AL10.AL_BUFFER, buffer);
 
+            if (startOffsetMs > 0L) {
+                float offsetSeconds = startOffsetMs / 1000.0F;
+                AL10.alSourcef(source, AL_SEC_OFFSET, offsetSeconds);
+
+                int offsetError = AL10.alGetError();
+                if (offsetError != AL10.AL_NO_ERROR) {
+                    CreateRailwayAnnouncer.LOGGER.warn(
+                            "Failed to set OGG playback offset: file={}, offsetMs={}, alError={}",
+                            oggPath,
+                            startOffsetMs,
+                            offsetError
+                    );
+                }
+            }
+
             float clampedTargetGain = clampGain(targetGain);
             float initialGain = fadeInMs > 0 ? 0.0F : clampedTargetGain;
             AL10.alSourcef(source, AL10.AL_GAIN, initialGain);
@@ -209,13 +242,14 @@ public final class LocalOggAudioPlayer {
             }
 
             CreateRailwayAnnouncer.LOGGER.info(
-                    "Started local OGG playback: {}, channels={}, sampleRate={}, samples={}, targetGain={}, fadeInMs={}",
+                    "Started local OGG playback: {}, channels={}, sampleRate={}, samples={}, targetGain={}, fadeInMs={}, startOffsetMs={}",
                     oggPath,
                     channels,
                     sampleRate,
                     pcm.remaining(),
                     clampedTargetGain,
-                    fadeInMs
+                    fadeInMs,
+                    startOffsetMs
             );
 
             schedulePoll(minecraft, activeSound);
