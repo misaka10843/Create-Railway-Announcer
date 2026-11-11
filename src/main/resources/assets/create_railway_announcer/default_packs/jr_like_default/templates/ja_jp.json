@@ -1,125 +1,4 @@
 {
-  "onboard_next_stop_test": {
-    "event": "onboard_next_stop",
-    "channel": "ONBOARD_VOICE",
-    "priority": 70,
-    "sequence": [
-      {
-        "type": "phrase",
-        "id": "common.next_is"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 420
-      },
-      {
-        "type": "station",
-        "id": "yurakucho",
-        "variant": "bare",
-        "text": "有楽町"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 260
-      },
-      {
-        "type": "station",
-        "id": "yurakucho",
-        "variant": "desu",
-        "text": "有楽町です"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 420
-      },
-      {
-        "type": "phrase",
-        "id": "common.door_left"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 500
-      },
-      {
-        "type": "line",
-        "id": "hibiya_line",
-        "variant": "bare",
-        "text": "地下鉄日比谷線"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 180
-      },
-      {
-        "type": "line",
-        "id": "yurakucho_line",
-        "variant": "bare",
-        "text": "地下鉄有楽町線"
-      },
-      {
-        "type": "phrase",
-        "id": "common.transfer_suffix"
-      }
-    ]
-  },
-  "priority_low_test": {
-    "event": "priority_low_test",
-    "channel": "ONBOARD_VOICE",
-    "priority": 30,
-    "sequence": [
-      {
-        "type": "phrase",
-        "id": "common.next_is"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 300
-      },
-      {
-        "type": "station",
-        "id": "low_priority_station",
-        "variant": "desu",
-        "text": "低い優先度です"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 800
-      },
-      {
-        "type": "phrase",
-        "id": "common.door_left"
-      }
-    ]
-  },
-  "priority_high_test": {
-    "event": "priority_high_test",
-    "channel": "ONBOARD_VOICE",
-    "priority": 90,
-    "sequence": [
-      {
-        "type": "phrase",
-        "id": "platform.door_closing"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 500
-      },
-      {
-        "type": "station",
-        "id": "high_priority_station",
-        "variant": "desu",
-        "text": "高い優先度です"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 800
-      },
-      {
-        "type": "phrase",
-        "id": "common.mind_belongings"
-      }
-    ]
-  },
   "onboard_next_stop_dynamic": {
     "event": "onboard_next_stop",
     "channel": "ONBOARD_VOICE",
@@ -127,66 +6,51 @@
     "sequence": [
       {
         "type": "subtitle",
-        "text": "次は {station}"
+        "text": "次は、{station_reading}、{station_reading}です。"
       },
       {
-        "type": "phrase",
-        "id": "common.next_is"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 420
-      },
-      {
-        "type": "station",
-        "variant": "bare"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 260
-      },
-      {
-        "type": "station",
-        "variant": "desu"
-      },
-      {
-        "type": "pause",
-        "duration_ms": 420
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">次は、{station_reading}、{station_reading}です。</prosody></voice></speak>"
       },
       {
         "type": "door_side_phrase"
       },
       {
-        "type": "pause",
-        "duration_ms": 500
-      },
-      {
-        "type": "transfer_lines",
-        "pause_ms_between": 180,
-        "include_suffix": true
+        "type": "condition",
+        "when": {
+          "has_transfers": true
+        },
+        "then": [
+          {
+            "type": "pause",
+            "duration_ms": 300
+          },
+          {
+            "type": "transfer_lines",
+            "pause_ms_between": 180,
+            "include_suffix": true
+          }
+        ]
       }
     ]
   },
-  "platform_door_closing_dynamic": {
-    "event": "platform_door_closing",
-    "channel": "PLATFORM_VOICE",
-    "priority": 90,
+  "onboard_approaching_dynamic": {
+    "event": "onboard_approaching",
+    "channel": "ONBOARD_VOICE",
+    "priority": 80,
     "sequence": [
       {
         "type": "subtitle",
-        "text": "{station}：ドアが閉まります"
+        "text": "まもなく、{station_reading}です。"
       },
       {
-        "type": "phrase",
-        "id": "platform.door_closing"
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">まもなく、{station_reading}です。</prosody></voice></speak>"
       },
       {
-        "type": "pause",
-        "duration_ms": 500
-      },
-      {
-        "type": "phrase",
-        "id": "common.mind_belongings"
+        "type": "door_side_phrase"
       }
     ]
   },
@@ -196,12 +60,64 @@
     "priority": 80,
     "sequence": [
       {
-        "type": "station",
-        "variant": "desu"
+        "type": "subtitle",
+        "text": "{station_reading}、{station_reading}です。"
       },
       {
-        "type": "phrase",
-        "id": "common.door_left"
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">{station_reading}、{station_reading}です。</prosody></voice></speak>"
+      },
+      {
+        "type": "door_side_phrase"
+      }
+    ]
+  },
+  "onboard_departing_dynamic": {
+    "event": "onboard_departing",
+    "channel": "ONBOARD_VOICE",
+    "priority": 60,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "ご乗車ありがとうございます。"
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">ご乗車ありがとうございます。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "onboard_terminal_dynamic": {
+    "event": "onboard_terminal",
+    "channel": "ONBOARD_VOICE",
+    "priority": 90,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "終点、{station_reading}です。お忘れ物のないよう、ご注意ください。"
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">終点、{station_reading}です。お忘れ物のないよう、ご注意ください。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "onboard_door_opening_dynamic": {
+    "event": "door_opening",
+    "channel": "ONBOARD_VOICE",
+    "priority": 90,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "ドアが開きます。足元にご注意ください。"
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">ドアが開きます。足元にご注意ください。</prosody></voice></speak>"
       }
     ]
   },
@@ -212,19 +128,141 @@
     "sequence": [
       {
         "type": "subtitle",
-        "text": "{station}：ドアが閉まります"
+        "text": "ドアが閉まります。ご注意ください。"
       },
       {
-        "type": "phrase",
-        "id": "platform.door_closing"
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">ドアが閉まります。ご注意ください。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "onboard_safety_dynamic": {
+    "event": "safety_notice",
+    "channel": "ONBOARD_VOICE",
+    "priority": 70,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "車内では、周りのお客様へのご配慮をお願いいたします。"
       },
       {
-        "type": "pause",
-        "duration_ms": 500
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">車内では、周りのお客様へのご配慮をお願いいたします。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_approach_dynamic": {
+    "event": "platform_approach",
+    "channel": "PLATFORM_VOICE",
+    "priority": 80,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "まもなく、{platform}番線に電車がまいります。危ないですから、黄色い線の内側までお下がりください。"
       },
       {
-        "type": "phrase",
-        "id": "common.mind_belongings"
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">まもなく、{platform}番線に電車がまいります。危ないですから、黄色い線の内側までお下がりください。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_arrival_dynamic": {
+    "event": "platform_arrival",
+    "channel": "PLATFORM_VOICE",
+    "priority": 80,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "{platform}番線に電車が到着しました。お降りのお客様を先にお通しください。"
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">{platform}番線に電車が到着しました。お降りのお客様を先にお通しください。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_pre_departure_dynamic": {
+    "event": "platform_pre_departure",
+    "channel": "PLATFORM_VOICE",
+    "priority": 85,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "{platform}番線の電車は、まもなく発車します。"
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">{platform}番線の電車は、まもなく発車します。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_door_closing_dynamic": {
+    "event": "platform_door_closing",
+    "channel": "PLATFORM_VOICE",
+    "priority": 90,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "{platform}番線の電車のドアが閉まります。ご注意ください。"
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">{platform}番線の電車のドアが閉まります。ご注意ください。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_departed_dynamic": {
+    "event": "platform_departed",
+    "channel": "PLATFORM_VOICE",
+    "priority": 70,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "{platform}番線の電車が発車しました。"
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">{platform}番線の電車が発車しました。</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_melody_dynamic": {
+    "event": "platform_departure_melody",
+    "channel": "MELODY",
+    "priority": 60,
+    "sequence": [
+      {
+        "type": "sound",
+        "file": "departure.ogg"
+      }
+    ]
+  },
+  "door_open_chime": {
+    "event": "door_open_chime",
+    "channel": "DOOR_CHIME",
+    "priority": 100,
+    "sequence": [
+      {
+        "type": "sound",
+        "file": "door_bip.ogg"
+      }
+    ]
+  },
+  "door_close_chime": {
+    "event": "door_close_chime",
+    "channel": "DOOR_CHIME",
+    "priority": 100,
+    "sequence": [
+      {
+        "type": "sound",
+        "file": "door_bip.ogg"
       }
     ]
   }

@@ -1,0 +1,9 @@
+[10:08:02] [main/ERROR]: Cannot initialize announcement audio encoder
+java.lang.NoClassDefFoundError: ws/schild/jave/EncoderException
+	at com.misaka10843.create_railway_announcer.audio.AudioCache$LazyAudioEncoder.encodeToOgg(AudioCache.java:104) [main/:?]
+	at AnnouncerLifecycleProbe.main(AnnouncerLifecycleProbe.java:30) [normal/:?]
+Caused by: java.lang.ClassNotFoundException: ws.schild.jave.EncoderException
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641) ~[?:?]
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188) ~[?:?]
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) ~[?:?]
+	... 2 more

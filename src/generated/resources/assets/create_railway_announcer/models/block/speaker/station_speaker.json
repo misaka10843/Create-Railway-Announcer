@@ -1,0 +1,9 @@
+{
+  "parent": "create_railway_announcer:block/speaker/body",
+  "textures": {
+    "casing": "create:block/andesite_casing",
+    "grille": "minecraft:block/black_concrete",
+    "indicator": "minecraft:block/lime_concrete",
+    "particle": "#casing"
+  }
+}

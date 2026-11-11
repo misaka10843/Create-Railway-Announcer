@@ -1,0 +1,27 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "create_railway_announcer:block/speaker/onboard_speaker",
+      "x": 90
+    },
+    "facing=east": {
+      "model": "create_railway_announcer:block/speaker/onboard_speaker",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "create_railway_announcer:block/speaker/onboard_speaker"
+    },
+    "facing=south": {
+      "model": "create_railway_announcer:block/speaker/onboard_speaker",
+      "y": 180
+    },
+    "facing=up": {
+      "model": "create_railway_announcer:block/speaker/onboard_speaker",
+      "x": 270
+    },
+    "facing=west": {
+      "model": "create_railway_announcer:block/speaker/onboard_speaker",
+      "y": 270
+    }
+  }
+}

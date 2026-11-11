@@ -46,7 +46,7 @@ authors="misaka10843"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Railway-style onboard and platform announcement system for Create trains, with configurable voice packs, station data, melodies, and Windows TTS bridge support.
+Station and onboard announcements for Create: Railway Signage.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
@@ -88,11 +88,29 @@ config="${mod_id}.mixins.json"
     ordering="NONE"
     side="BOTH"
 
+
+[[dependencies.${mod_id}]]
+    modId="create_railway_signage"
+    type="required"
+    versionRange="[0.2.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
 [[dependencies.${mod_id}]]
     modId="create"
     type="required"
     versionRange="[6.0.10,6.1.0)"
-    ordering="NONE"
+    ordering="AFTER"
+    side="BOTH"
+
+# LDLib2 backs the line/fare editor and, going forward, the rest of the editing screens.
+# It is required rather than optional: screen classes reference it directly, so a client
+# without it would fail to load this mod's classes instead of degrading gracefully.
+[[dependencies.${mod_id}]]
+    modId="ldlib2"
+    type="required"
+    versionRange="[2.2.41,)"
+    ordering="AFTER"
     side="BOTH"
 
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares

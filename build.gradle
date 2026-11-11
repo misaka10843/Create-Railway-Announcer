@@ -1,7 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.141'
+    id 'net.neoforged.moddev' version '2.0.142'
     id 'idea'
 }
 
@@ -24,12 +24,31 @@ sourceSets.main.resources {
     // Exclude common development only resources from finalized outputs
     exclude("**/*.bbmodel") // BlockBench project files
     exclude("src/generated/**/.cache") // datagen cache files
+
+    // Blockbench 参考纹理：模型以 create: / minecraft: 命名空间引用纹理，Blockbench 需要
+    // 在本地按 assets/<namespace>/textures/ 找到对应 PNG 才能加载模型，因此保留一份最小
+    // 集合供建模使用（由 tools/sync_reference_textures.ps1 同步）。
+    // 运行时这些纹理由原版与 Create 自身提供，绝不能打进发布 jar，否则会覆盖原版资源。
+    exclude("assets/minecraft/**")
+    exclude("assets/create/**")
 }
 
 repositories {
-    mavenCentral()
+    exclusiveContent {
+        forRepository { maven { url = "https://repo.maven.apache.org/maven2" } }
+        filter { includeGroup "ws.schild" }
+    }
     maven { url = "https://maven.createmod.net" }
     maven { url = "https://maven.ithundxr.dev/snapshots" }
+    // LDLib2 is published only here. Note for anyone debugging a slow first build:
+    // this host is reachable but heavily throttled on some networks (measured ~12 KB/s
+    // against ~500 KB/s from Maven Central) and it does NOT honour Range requests, so an
+    // interrupted download restarts from zero. It is a one-time cost — Gradle caches the
+    // artifact in GRADLE_USER_HOME afterwards.
+    maven { url = "https://maven.firstdark.dev/snapshots" }
+    // yoga / taffy / kotlin-stdlib are transitive LDLib2 dependencies resolved from Central,
+    // not from the FirstDark snapshot repository.
+    mavenCentral()
 }
 
 base {
@@ -56,7 +75,16 @@ neoForge {
     runs {
         client {
             client()
-
+            jvmArguments = [
+                    '-Xmx8G'
+            ]
+            // Dev knob: skip the title screen and load a world directly, so an in-world symptom can
+            // be reproduced (and measured) without a human at the keyboard.
+            //   ./gradlew runClient -PquickPlay=<save folder name>
+            if (project.hasProperty('quickPlay')) {
+                programArgument '--quickPlaySingleplayer'
+                programArgument project.property('quickPlay').toString()
+            }
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
@@ -120,31 +148,25 @@ configurations {
 }
 
 dependencies {
+    for (artifact in ['jave-core', 'jave-nativebin-win64', 'jave-nativebin-linux64', 'jave-nativebin-osx64', 'jave-nativebin-osxm1']) {
+        jarJar(implementation("ws.schild:${artifact}:3.5.0")) {
+            version { strictly '3.5.0' }
+        }
+        additionalRuntimeClasspath "ws.schild:${artifact}:3.5.0"
+    }
+    implementation files(providers.gradleProperty('signageJar').getOrElse("../Create-Railway-Signage/build/libs/create_railway_signage-${signage_version}.jar"))
     implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
     implementation("net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}")
     compileOnly("dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}")
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     implementation("com.tterrag.registrate:Registrate:${registrate_version}")
-    jarJar(implementation("ws.schild:jave-core:3.5.0")) {
-        version {
-            strictly "[3.5.0,3.6.0)"
-            prefer "3.5.0"
-        }
-    }
 
-    jarJar(implementation("ws.schild:jave-nativebin-win64:3.5.0")) {
-        version {
-            strictly "[3.5.0,3.6.0)"
-            prefer "3.5.0"
-        }
-    }
-
-// Required for NeoForge dev runs on MC 1.21.1.
-// Without this, Java libraries may compile and jarJar correctly,
-// but still be missing at runClient/runtime.
-    additionalRuntimeClasspath "ws.schild:jave-core:3.5.0"
-    additionalRuntimeClasspath "ws.schild:jave-nativebin-win64:3.5.0"
+    // LDLib2 provides the ModularUI framework and the in-game UI editor (/ldlib2_ui_editor).
+    // It is a hard runtime dependency: screens built on it cannot load without the library.
+    // Per upstream instructions, do NOT shade or relocate it.
+    implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-${minecraft_version}:${ldlib2_version}:all")
 }
+
 
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
@@ -186,6 +208,37 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+abstract class WriteAnnouncerProbeClasspath extends DefaultTask {
+    @Classpath abstract ConfigurableFileCollection getRuntimeLibraries()
+    @OutputFile abstract RegularFileProperty getDestination()
+    @TaskAction void writeClasspath() {
+        def target = destination.get().asFile
+        target.parentFile.mkdirs()
+        target.setText(runtimeLibraries.files.collect { it.absolutePath }.join('\n'), 'UTF-8')
+    }
+}
+
+tasks.register('writeAnnouncerProbeClasspath', WriteAnnouncerProbeClasspath) {
+    runtimeLibraries.from(configurations.runtimeClasspath)
+    destination.set(layout.buildDirectory.file('announcerProbeClasspath.txt'))
+}
+
+tasks.register('checkAnnouncements', Exec) {
+    dependsOn 'compileJava', 'writeClientLegacyClasspath', 'writeAnnouncerProbeClasspath', 'jar'
+    workingDir projectDir
+    environment 'JAVA_HOME', javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }.get().metadata.installationPath.asFile.absolutePath
+    commandLine 'node', 'tools/check_announcer.mjs'
+}
+
+neoForge.ideSyncTask tasks.named('writeClientLegacyClasspath')
+neoForge.ideSyncTask tasks.named('writeServerLegacyClasspath')
+
+tasks.named('check') {
+    dependsOn 'checkAnnouncements'
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.

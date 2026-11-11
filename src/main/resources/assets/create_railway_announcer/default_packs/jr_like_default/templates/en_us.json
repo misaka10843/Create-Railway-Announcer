@@ -1,0 +1,269 @@
+{
+  "onboard_next_stop_dynamic": {
+    "event": "onboard_next_stop",
+    "channel": "ONBOARD_VOICE",
+    "priority": 70,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "The next stop is {station_reading}."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">The next stop is {station_reading}.</prosody></voice></speak>"
+      },
+      {
+        "type": "door_side_phrase"
+      },
+      {
+        "type": "condition",
+        "when": {
+          "has_transfers": true
+        },
+        "then": [
+          {
+            "type": "pause",
+            "duration_ms": 300
+          },
+          {
+            "type": "transfer_lines",
+            "pause_ms_between": 180,
+            "include_suffix": true
+          }
+        ]
+      }
+    ]
+  },
+  "onboard_approaching_dynamic": {
+    "event": "onboard_approaching",
+    "channel": "ONBOARD_VOICE",
+    "priority": 80,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "We will soon arrive at {station_reading}."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">We will soon arrive at {station_reading}.</prosody></voice></speak>"
+      },
+      {
+        "type": "door_side_phrase"
+      }
+    ]
+  },
+  "onboard_arrived_dynamic": {
+    "event": "onboard_arrived",
+    "channel": "ONBOARD_VOICE",
+    "priority": 80,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "This is {station_reading}."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">This is {station_reading}.</prosody></voice></speak>"
+      },
+      {
+        "type": "door_side_phrase"
+      }
+    ]
+  },
+  "onboard_departing_dynamic": {
+    "event": "onboard_departing",
+    "channel": "ONBOARD_VOICE",
+    "priority": 60,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "Thank you for travelling with us."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">Thank you for travelling with us.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "onboard_terminal_dynamic": {
+    "event": "onboard_terminal",
+    "channel": "ONBOARD_VOICE",
+    "priority": 90,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "This train terminates at {station_reading}. Please take all your belongings."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">This train terminates at {station_reading}. Please take all your belongings.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "onboard_door_opening_dynamic": {
+    "event": "door_opening",
+    "channel": "ONBOARD_VOICE",
+    "priority": 90,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "The doors are opening. Please watch your step."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">The doors are opening. Please watch your step.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "onboard_door_closing_dynamic": {
+    "event": "door_closing",
+    "channel": "ONBOARD_VOICE",
+    "priority": 90,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "The doors are closing. Please stand clear."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">The doors are closing. Please stand clear.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "onboard_safety_dynamic": {
+    "event": "safety_notice",
+    "channel": "ONBOARD_VOICE",
+    "priority": 70,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "Please be considerate of other passengers."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">Please be considerate of other passengers.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_approach_dynamic": {
+    "event": "platform_approach",
+    "channel": "PLATFORM_VOICE",
+    "priority": 80,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "A train is approaching platform {platform}. Please stand behind the yellow line."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">A train is approaching platform {platform}. Please stand behind the yellow line.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_arrival_dynamic": {
+    "event": "platform_arrival",
+    "channel": "PLATFORM_VOICE",
+    "priority": 80,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "A train has arrived at platform {platform}. Please allow passengers to alight first."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">A train has arrived at platform {platform}. Please allow passengers to alight first.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_pre_departure_dynamic": {
+    "event": "platform_pre_departure",
+    "channel": "PLATFORM_VOICE",
+    "priority": 85,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "The train at platform {platform} will depart shortly."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">The train at platform {platform} will depart shortly.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_door_closing_dynamic": {
+    "event": "platform_door_closing",
+    "channel": "PLATFORM_VOICE",
+    "priority": 90,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "The doors of the train at platform {platform} are closing. Please stand clear."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">The doors of the train at platform {platform} are closing. Please stand clear.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_departed_dynamic": {
+    "event": "platform_departed",
+    "channel": "PLATFORM_VOICE",
+    "priority": 70,
+    "sequence": [
+      {
+        "type": "subtitle",
+        "text": "The train at platform {platform} has departed."
+      },
+      {
+        "type": "tts_raw",
+        "ssml": true,
+        "text": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{voice}\"><prosody rate=\"{rate}\" pitch=\"{pitch}\">The train at platform {platform} has departed.</prosody></voice></speak>"
+      }
+    ]
+  },
+  "platform_melody_dynamic": {
+    "event": "platform_departure_melody",
+    "channel": "MELODY",
+    "priority": 60,
+    "sequence": [
+      {
+        "type": "sound",
+        "file": "departure.ogg"
+      }
+    ]
+  },
+  "door_open_chime": {
+    "event": "door_open_chime",
+    "channel": "DOOR_CHIME",
+    "priority": 100,
+    "sequence": [
+      {
+        "type": "sound",
+        "file": "door_bip.ogg"
+      }
+    ]
+  },
+  "door_close_chime": {
+    "event": "door_close_chime",
+    "channel": "DOOR_CHIME",
+    "priority": 100,
+    "sequence": [
+      {
+        "type": "sound",
+        "file": "door_bip.ogg"
+      }
+    ]
+  }
+}
